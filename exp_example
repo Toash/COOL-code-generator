@@ -1,0 +1,36 @@
+method
+
+2       //method (id)
+main
+
+0       // formal list
+
+2       // return type (id)
+Object
+
+3       
+SELF_TYPE   // annotated!
+
+self_dispatch   // method stuff
+3
+out_int
+1
+
+3           
+Int     // annotated!
+times
+    3       
+    Int     // annotated!
+    plus
+        3       
+        Int     // annotated!
+        integer
+        1
+        3       
+        Int     // annotated!
+        integer
+        3
+    3           
+    Int     // annotated!
+    integer
+    7
