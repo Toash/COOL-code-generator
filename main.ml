@@ -1,6 +1,5 @@
 open Printf
 (*
-
 PA3 Checkpoint 2
 generate TAC for a method body
 
@@ -32,7 +31,7 @@ let main () = begin
     fun () -> 
       let v = !counter in
       counter := !counter + 1;
-      "t" ^ (string_of_int v)
+      "t$" ^ (string_of_int v)
   in
 
   (*
@@ -116,7 +115,7 @@ let main () = begin
     if line = "method" then 
       (* we just want the method body *)
       let (m_loc, method_name) = read_id () in
-      let formals = read_formal () in
+      let formals = read_list read_formal  in
       let (t_loc,t_id) = read_id () in
       fprintf fout "comment start\n";
       (* label Main_main_0 *)
@@ -126,11 +125,10 @@ let main () = begin
       read_method ()
   in
   read_method(); 
-  
   (* start reading the method body*)
   (* just expressions, lets go !!!!*)
- 
   let method_body = read_method_body () in
+  
   let instructions, expression = convert method_body in
   (* print expressions*)
   List.iter (fun x -> (match x 
