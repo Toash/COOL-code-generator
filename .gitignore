@@ -1,0 +1,6 @@
+*.cl-ast
+*.cl-tac
+*.cl-type
+*.cmi
+*.cmo
+*.cl
