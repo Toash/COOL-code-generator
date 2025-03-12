@@ -1,7 +1,7 @@
 open Printf
 (*
 PA3 Checkpoint 2
-generate TAC for a method body
+generate TAC for cool programs 
 
 traverse ast
 we want to get all the meaningful stuff, ignore other stuff.
@@ -23,6 +23,8 @@ and formal = id * cool_type
 and binding = id * cool_type * (exp option) 
 and case_element = id * cool_type * exp 
 and exp = 
+  | AST_Self_Dispatch of id * (exp list)
+
   | AST_Block of exp list
  
   | AST_New of cool_type
@@ -41,6 +43,7 @@ and exp =
 and
 (* what we will output *)
 tac_instr = 
+| TAC_Assign_Call of  string * string * tac_expr(* t$0 <- call out_int t$1 *)
 | TAC_Assign_Int of string * string (* x <- int 1 *) 
 | TAC_Assign_Plus of string * tac_expr * tac_expr (* x <- + 1 2 *)
 | TAC_Assign_Minus of string * tac_expr * tac_expr (* x <- - 1 2 *)
@@ -50,7 +53,7 @@ and
 tac_expr =
 | TAC_Variable of string
 
-let counter = ref 1 
+let counter = ref 0 
 let main () = begin
   (* 
   when recursive descenting and finding variable,
@@ -67,7 +70,7 @@ let main () = begin
   convert expressions in ast to TAC instructions
 
   return list of instructions and
-  return variable 
+  the returned variable 
   *)
   let rec convert ast = begin
     match ast with
@@ -87,10 +90,33 @@ let main () = begin
       in
       convert_block v
     | AST_Variable (v) -> [], TAC_Variable(v)
+    
+
+
+
+    | AST_Self_Dispatch ((_,mname), exps) -> 
+      let instr, return_exp= List.fold_left (fun (acc_inst, acc_exp) exp -> 
+        (* extract instructions and return value *)
+        let inst, expr = convert exp in
+        (acc_inst @ inst, acc_exp @ [expr])
+      ) ([], []) exps in
+      (*hmm*)
+      let last_return_exp= List.hd (List.rev return_exp) in
+      let new_var = fresh_var () in
+      (* t0 <- call out_int t1  (just have to match t1) *)
+      let to_output = TAC_Assign_Call(new_var,mname,last_return_exp) in
+      (instr@ [to_output]), TAC_Variable(new_var)
+    
+
+
+
     | AST_Int (v) -> 
       let new_var = fresh_var () in
       [TAC_Assign_Int (new_var, v)], TAC_Variable(new_var)
     | AST_Plus(a1,a2) ->
+      (*
+      to output correct register numbers, the var for the instructions before calling convert
+      *)
       let i1, ta1 = convert a1 in
       let i2, ta2 = convert a2 in
       let new_var = fresh_var () in
@@ -203,33 +229,31 @@ let main () = begin
     let loc = read() in
     let annotated_type = read() in
     let ast_root= match read() with
+    | "self_dispatch" ->
+      let id = read_id() in
+      let exps = read_list read_exp in
+      AST_Self_Dispatch(id, exps)
     | "plus" -> 
-      (* printf "reading plus\n"; *)
       let exp1 = read_exp() in
       let exp2 = read_exp() in
       AST_Plus(exp1,exp2)
     | "minus" -> 
-      (* printf "reading plus\n"; *)
       let exp1 = read_exp() in
       let exp2 = read_exp() in
       AST_Minus(exp1,exp2)
     | "times" -> 
-      (* printf "reading plus\n"; *)
       let exp1 = read_exp() in
       let exp2 = read_exp() in
       AST_Times(exp1,exp2)
     | "divide" -> 
-      (* printf "reading plus\n"; *)
       let exp1 = read_exp() in
       let exp2 = read_exp() in
       AST_Divide(exp1,exp2)
     | "integer" ->
       let ival=read() in 
-      (* printf "reading integer %s\n" ival; *)
       AST_Int(ival)
     | "identifier" -> 
       let _,ident = read_id () in
-      (* printf "reading identifier %s\n" ident; *)
       AST_Variable(ident)
     | "block" ->
       AST_Block(read_list read_exp)
@@ -240,11 +264,13 @@ let main () = begin
     in 
     ast_root
   in
-  let print_tac instructions expression = 
+  let rec print_tac instructions expression = 
     (* let instructions, expression = convert method_body in *)
     (* print expressions*)
     List.iter (fun x -> (match x 
     with
+   | TAC_Assign_Call (var, mname, e) -> 
+        fprintf fout "%s <- call %s %s\n" var mname (match e with TAC_Variable(v) -> v)  
     | TAC_Assign_Int (v,i) -> 
         fprintf fout "%s <- int %s\n" v i
     | TAC_Assign_Plus (v, e1, e2) -> 
@@ -272,7 +298,7 @@ let main () = begin
       | Method((_,mname), formals, mtype, mbody) -> 
         fprintf fout "label %s_%s_0\n" cname mname;
         (* convert method body to TAC *)
-        let _ = counter := 1 in
+        let _ = counter := 0 in
         let instructions, expression = convert mbody in
         print_tac instructions expression;
       | _ -> ()
@@ -280,7 +306,7 @@ let main () = begin
       
   ) ) ast;
 
-  printf "%s\n" out;
+  (* printf "%s\n" out; *)
 
   close_out fout;
   
