@@ -7,11 +7,26 @@ traverse ast
 we want to get all the meaningful stuff, ignore other stuff.
 *)
 
-type ast_root = 
+type cool_program = cool_class list
+and loc = string 
+and id = loc * string 
+
+and cool_type = id 
+
+and cool_class = id * (id option) * feature list
+
+and feature =
+  | Attribute of id * cool_type * (exp option) 
+  | Method of id * (formal list) * cool_type * exp
+and formal = id * cool_type 
+
+and binding = id * cool_type * (exp option) 
+and case_element = id * cool_type * exp 
+and exp = 
   | AST_Variable of string
   | AST_Int of string 
-  | AST_Plus of ast_root * ast_root
-  | AST_Times of ast_root * ast_root
+  | AST_Plus of exp * exp
+  | AST_Times of exp * exp
 and
 (* what we will output *)
 tac_instr = 
@@ -59,6 +74,9 @@ let main () = begin
   let fname = Sys.argv.(1) in
   let fin = open_in fname in 
 
+  let out = (Filename.chop_extension fname) ^ ".cl-tac" in
+  let fout = open_out out in
+
   let read () = 
     input_line fin 
   in
@@ -71,14 +89,65 @@ let main () = begin
     let lst = range k in
     List.map(fun _ -> worker()) lst
   in
-  let rec read_method_body () =
-    read_exp()
-  and
+  (* ugly *)
+  let read_list2 worker = (* call worker k times *)  
+    let k = int_of_string(read()) in
+    let lst = range (k*2) in
+    List.map(fun _ -> worker()) lst
+  in
+  (* let rec read_method_body () =
+    read_exp() *)
+  let rec read_aast() = 
+    try
+      let line = input_line fin in
+      if line = "parent_map" then begin
+        (* read the parent map away *)
+        read_list2 read;
+
+        (* read classes until we find a method *)
+        read_list(read_cool_class)
+      end
+      else
+        read_aast()
+    with Not_found -> 
+         printf "error: did not find implementation\n"; 
+         exit 1
+  and 
   read_id() = 
     let loc = input_line fin in
     let id = input_line fin in
     (loc,id)
-  and
+  and read_cool_class () =
+    let cname = read_id() in 
+    let inherits = match read() with
+    | "no_inherits" -> None
+    | "inherits" ->
+      let super = read_id () in
+      Some(super)
+    | x -> failwith ("error reading class:" ^ x)
+    in
+    let features = read_list read_feature in
+    (cname, inherits, features)
+  and read_feature () = 
+    let feature_type = read() in
+    match feature_type with
+    | "attribute_no_init" ->
+      let fname = read_id() in
+      let ftype = read_id() in
+      Attribute(fname, ftype, None) 
+    | "attribute_init" ->
+      let fname = read_id() in
+      let ftype = read_id() in
+      let finit = read_exp() in
+      Attribute(fname, ftype, (Some finit))
+    | "method" ->
+      let mname = read_id() in
+      let formals = read_list read_formal in
+      let mtype = read_id() in
+      let mbody = read_exp() in 
+      Method(mname, formals, mtype, mbody)
+    | x -> failwith ("error reading feature:" ^ x)
+    and
   read_formal () =
     let fname = read_id () in
     let ftype = read_id() in
@@ -88,17 +157,17 @@ let main () = begin
     let annotated_type = read() in
     let ast_root= match read() with
     | "plus" -> 
-      printf "reading plus\n";
+      (* printf "reading plus\n"; *)
       let exp1 = read_exp() in
       let exp2 = read_exp() in
       AST_Plus(exp1,exp2)
     | "integer" ->
       let ival=read() in 
-      printf "reading integer %s\n" ival;
+      (* printf "reading integer %s\n" ival; *)
       AST_Int(ival)
     | "identifier" -> 
       let _,ident = read_id () in
-      printf "reading identifier %s\n" ident;
+      (* printf "reading identifier %s\n" ident; *)
       AST_Variable(ident)
     | x -> (
       printf "expression kind unhandled: %s" x;
@@ -107,38 +176,43 @@ let main () = begin
     in 
     ast_root
   in
-  let out = "my_epic_tac" in
-  let fout = open_out out in
-
-  let rec read_method () = 
-    let line = input_line fin in
-    if line = "method" then 
-      (* we just want the method body *)
-      let (m_loc, method_name) = read_id () in
-      let formals = read_list read_formal  in
-      let (t_loc,t_id) = read_id () in
-      fprintf fout "comment start\n";
-      (* label Main_main_0 *)
-      (* hard coding the class need to fix later*)
-      fprintf fout "label Main_%s_0\n" method_name;
-    else
-      read_method ()
+  let print_tac instructions expression = 
+    (* let instructions, expression = convert method_body in *)
+    (* print expressions*)
+    List.iter (fun x -> (match x 
+    with
+    | TAC_Assign_Int (v,i) -> 
+        fprintf fout "%s <- int %s\n" v i
+    | TAC_Assign_Plus (v, e1, e2) -> 
+        fprintf fout "%s <- + %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
+    ) ) instructions;
+    fprintf fout "return %s\n" (match expression with TAC_Variable(v) -> v); 
   in
-  read_method(); 
-  (* start reading the method body*)
-  (* just expressions, lets go !!!!*)
-  let method_body = read_method_body () in
-  
-  let instructions, expression = convert method_body in
-  (* print expressions*)
-  List.iter (fun x -> (match x 
+  (* go through ast and print TAC *)
+  let ast = read_aast() in
+  List.iter (fun x -> (match x
   with
-  | TAC_Assign_Int (v,i) -> 
-      fprintf fout "%s <- int %s\n" v i
-  | TAC_Assign_Plus (v, e1, e2) -> 
-      fprintf fout "%s <- + %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
-  ) ) instructions;
-  fprintf fout "return %s\n" (match expression with TAC_Variable(v) -> v); 
+  | ((_,cname), _ , features) -> 
+      (*
+        add exp to list
+      *)
+      List.iter(fun x -> (match x
+      with
+      | Attribute(fname, ftype, Some(finit)) -> 
+        fprintf fout "attribute, need to handle later\n";
+        ()
+      | Method((_,mname), formals, mtype, mbody) -> 
+        fprintf fout "comment start\n";
+        fprintf fout "label %s_%s_0\n" cname mname;
+        (* convert method body to TAC *)
+        let instructions, expression = convert mbody in
+        print_tac instructions expression;
+      | _ -> ()
+      ) ) features; 
+      
+  ) ) ast;
+
+  
 
   close_out fout;
   
