@@ -2,9 +2,8 @@ open Printf
 (*
 PA3 Checkpoint 2
 generate TAC for cool programs 
-
-traverse ast
-we want to get all the meaningful stuff, ignore other stuff.
+basically a more generalized version of assembly
+i dont know exactly why, but it supposedly will help us with code generation.
 *)
 
 type cool_program = cool_class list
@@ -25,9 +24,16 @@ and case_element = id * cool_type * exp
 and exp = 
   | AST_Self_Dispatch of id * (exp list)
 
+  (*
+  1. guard
+  2. then
+  3. else 
+  *)
+  | AST_If of exp * exp * exp 
+  | AST_While of exp * exp (* while (guard) { body } *)
   | AST_Block of exp list
  
-  | AST_New of cool_type
+  | AST_New of string (* dont need to store the line number *)
   | AST_Isvoid of exp
 
   | AST_Plus of exp * exp
@@ -35,25 +41,69 @@ and exp =
   | AST_Times of exp * exp
   | AST_Divide of exp * exp
 
+  | AST_LessThan of exp * exp
+  | AST_LessThanEqual of exp * exp
+  | AST_Equal of exp * exp
+
   | AST_Not of exp
   | AST_Negate of exp
 
   | AST_Int of string 
+  | AST_String of string
   | AST_Variable of string
+  | AST_Bool of string
+
+  | AST_Let of binding list * exp
+
 and
-(* what we will output *)
+(* what we will output (as TAC) *)
 tac_instr = 
+| TAC_Assign of tac_expr * tac_expr (* t$0 <- t$1 *)
 | TAC_Assign_Call of  string * string * tac_expr(* t$0 <- call out_int t$1 *)
-| TAC_Assign_Int of string * string (* x <- int 1 *) 
+
+| TAC_Assign_New of string * string (* t$0 <- new String *)
+| TAC_Assign_IsVoid of string * tac_expr (* t$0 <- isvoid t$1 *)
+
 | TAC_Assign_Plus of string * tac_expr * tac_expr (* x <- + 1 2 *)
 | TAC_Assign_Minus of string * tac_expr * tac_expr (* x <- - 1 2 *)
 | TAC_Assign_Times of string * tac_expr * tac_expr (* x <- * 1 2 *)
 | TAC_Assign_Divide of string * tac_expr * tac_expr (* x <- / 1 2 *)
+
+| TAC_Assign_LessThan of string * tac_expr * tac_expr (* x <- < 1 2 *)
+| TAC_Assign_LessThanEqual of string * tac_expr * tac_expr (* x <- <= 1 2 *)
+| TAC_Assign_Equal of string * tac_expr * tac_expr (* x <- = 1 2 *)
+
+
+| TAC_Assign_Int of string * string (* x <- int 1 *) 
+| TAC_Assign_Bool of string * string (* x <- bool true *)
+| TAC_Assign_String of string * string (* x <- string "hello" *)
+
+(* ones complement *)
+| TAC_Assign_Not of string * tac_expr (* x <- not t$0 *)
+(*arithmetic negaition (twos complement )*)
+| TAC_Assign_Negate of string * tac_expr (* x <- ~ t$0 *)
+
+  (* 
+  branch if true
+  branch to the label if the expression is true.
+  we generate a branch if true instruction  to jump to then branch
+  else generate a jump instruction to the else branch
+  
+  *) 
+| TAC_Bt of tac_expr * string (* bt t$0 Main_main_1 *)
+
+(* unconditional jump*)
+| TAC_Jmp of string (* jmp Main_main_0 *)
+| TAC_Label of string (* label Main_main_1 *)
+
+
 and
 tac_expr =
 | TAC_Variable of string
 
 let counter = ref 0 
+let label_counter = ref 0
+
 let main () = begin
   (* 
   when recursive descenting and finding variable,
@@ -64,6 +114,12 @@ let main () = begin
       let v = !counter in
       counter := !counter + 1;
       "t$" ^ (string_of_int v)
+    in
+
+  let fresh_label () = 
+    let l = !label_counter in
+    label_counter := !label_counter + 1;
+    "confusingly_named_label_" ^ (string_of_int l)
   in
 
   (*
@@ -74,6 +130,51 @@ let main () = begin
   *)
   let rec convert ast = begin
     match ast with
+    | AST_Variable (v) -> [], TAC_Variable(v)
+    
+
+    | AST_Self_Dispatch ((_,mname), exps) -> 
+      let instr, return_exp= List.fold_left (fun (acc_inst, acc_exp) exp -> 
+        (* extract instructions and return value *)
+        let inst, expr = convert exp in
+        (acc_inst @ inst, acc_exp @ [expr])
+      ) ([], []) exps in
+      (*hmm*)
+      let last_return_exp= List.hd (List.rev return_exp) in
+      let new_var = fresh_var () in
+      (* t0 <- call out_int t1  (just have to match t1) *)
+      let to_output = TAC_Assign_Call(new_var,mname,last_return_exp) in
+      (instr@ [to_output]), TAC_Variable(new_var)
+   
+    | AST_If(cond, then_branch, else_branch) ->
+      (* get tac instructions, and var for these.*)
+      let cond_instr, cond_var = convert cond in
+      let then_instr, then_var = convert then_branch in
+      let else_instr, else_var = convert else_branch in
+
+      let then_label = fresh_label () in
+      let else_label = fresh_label () in
+      let join_label = fresh_label () in
+
+      let bt_instr = TAC_Bt(cond_var, then_label) in
+      let jmp_else = TAC_Jmp(else_label) in
+      let jmp_join = TAC_Jmp(join_label) in
+      (cond_instr @ [bt_instr; jmp_else; TAC_Label then_label] 
+      @ then_instr @ [jmp_join; TAC_Label else_label] 
+      @ else_instr @ [TAC_Label join_label]), then_var
+
+    | AST_While(cond, body) ->
+      (* get tac instructions, and var for these.*)
+      let cond_instr, cond_var = convert cond in
+      let body_instr, body_var = convert body in
+
+      let while_label = fresh_label () in
+      let join_label = fresh_label () in
+
+      let bt_instr = TAC_Bt(cond_var, while_label) in
+      let jmp_join = TAC_Jmp(join_label) in
+      (TAC_Label while_label :: cond_instr @ [bt_instr; jmp_join] 
+      @ body_instr @ [jmp_join; TAC_Label join_label]), body_var
     | AST_Block(v) -> 
       (* 
       accumualte instructions for each instruction in the block,
@@ -89,30 +190,17 @@ let main () = begin
           i1@i2, t2
       in
       convert_block v
-    | AST_Variable (v) -> [], TAC_Variable(v)
-    
 
-
-
-    | AST_Self_Dispatch ((_,mname), exps) -> 
-      let instr, return_exp= List.fold_left (fun (acc_inst, acc_exp) exp -> 
-        (* extract instructions and return value *)
-        let inst, expr = convert exp in
-        (acc_inst @ inst, acc_exp @ [expr])
-      ) ([], []) exps in
-      (*hmm*)
-      let last_return_exp= List.hd (List.rev return_exp) in
+    | AST_New (t) ->
       let new_var = fresh_var () in
-      (* t0 <- call out_int t1  (just have to match t1) *)
-      let to_output = TAC_Assign_Call(new_var,mname,last_return_exp) in
-      (instr@ [to_output]), TAC_Variable(new_var)
-    
-
-
-
-    | AST_Int (v) -> 
+      [TAC_Assign_New(new_var, t)], TAC_Variable(new_var)
+    | AST_Isvoid (v) ->
       let new_var = fresh_var () in
-      [TAC_Assign_Int (new_var, v)], TAC_Variable(new_var)
+      let i1, ta1 = convert v in
+      let
+      to_output = TAC_Assign_IsVoid(new_var, ta1) in
+      (i1@[to_output]), TAC_Variable(new_var)
+
     | AST_Plus(a1,a2) ->
       (*
       to output correct register numbers, the var for the instructions before calling convert
@@ -140,6 +228,77 @@ let main () = begin
       let new_var = fresh_var () in
       let to_output = TAC_Assign_Divide(new_var, ta1, ta2) in
       (i1@i2@[to_output]), TAC_Variable(new_var)
+
+    | AST_LessThan(a1,a2) ->
+      let i1, ta1 = convert a1 in
+      let i2, ta2 = convert a2 in
+      let new_var = fresh_var () in
+      let to_output = TAC_Assign_LessThan(new_var, ta1, ta2) in
+      (i1@i2@[to_output]), TAC_Variable(new_var)
+    | AST_LessThanEqual(a1,a2) ->
+      let i1, ta1 = convert a1 in
+      let i2, ta2 = convert a2 in
+      let new_var = fresh_var () in
+      let to_output = TAC_Assign_LessThanEqual(new_var, ta1, ta2) in
+      (i1@i2@[to_output]), TAC_Variable(new_var)
+    | AST_Equal(a1,a2) ->
+      let i1, ta1 = convert a1 in
+      let i2, ta2 = convert a2 in
+      let new_var = fresh_var () in
+      let to_output = TAC_Assign_Equal(new_var, ta1, ta2) in
+      (i1@i2@[to_output]), TAC_Variable(new_var)
+
+    | AST_Int (v) -> 
+      let new_var = fresh_var () in
+      [TAC_Assign_Int (new_var, v)], TAC_Variable(new_var)
+    | AST_Bool (v) -> 
+      let new_var = fresh_var () in
+      [TAC_Assign_Bool (new_var, v)], TAC_Variable(new_var)
+    | AST_String (v) ->
+      let new_var = fresh_var () in
+      [TAC_Assign_String (new_var, v)], TAC_Variable(new_var)
+    | AST_Not (v) ->
+      let new_var = fresh_var () in
+      let i1, ta1 = convert v in
+      let
+      to_output = TAC_Assign_Not(new_var, ta1) in
+      (i1@[to_output]), TAC_Variable(new_var)
+    | AST_Negate (v) ->
+      let new_var = fresh_var () in
+      let i1, ta1 = convert v in
+      let
+      to_output = TAC_Assign_Negate(new_var, ta1) in
+      (i1@[to_output]), TAC_Variable(new_var)
+
+    | AST_Let(bindings, body) ->
+      (* this is broken... *)
+      (* 
+      let bindings = read_list read_binding in
+      let body = read_exp() in
+      *)
+      let rec convert_let lst =
+        match lst with
+        | [] -> failwith "empty let"
+        | [x] -> convert x
+        | hd::tl -> 
+          let i1, t1 = convert hd in
+          let i2, t2 = convert_let tl in
+          i1@i2, t2
+      in
+      let bindings_as_exps = List.map (fun ((_,id), typ, exp_opt) -> 
+        match exp_opt with
+        | Some(exp) -> exp
+        | None -> AST_Variable(id) (* TODO: DEFAULT *)
+      ) bindings in
+
+      let instr, ret = convert_let bindings_as_exps in
+
+      let new_var1 = fresh_var () in
+      let assign = TAC_Assign(TAC_Variable(new_var1),ret) in
+
+      (*body needs access to the new variable from assign*)
+      let binstr , bexp = convert body in
+      (instr@  [assign] @ binstr ), bexp
     | _ -> failwith "not implemented"
   
     end in
@@ -224,15 +383,53 @@ let main () = begin
   read_formal () =
     let fname = read_id () in
     let ftype = read_id() in
-    (fname, ftype)
+  (fname, ftype)
+  and read_binding () =
+    match read() with
+    | "let_binding_no_init" ->
+      let bname = read_id() in
+      let btype = read_id() in
+      (bname,btype,None)
+    | "let_binding_init" ->
+      let bname = read_id() in
+      let btype = read_id() in
+      let bval = read_exp() in
+      (bname,btype,Some(bval))
+    | x -> failwith("error reading let binding:" ^x)
+  (* and read_case_element() = 
+    let cevar = read_id() in
+    let cetype = read_id() in
+    let cebody = read_exp() in
+    (cevar,cetype,cebody)  *)
   and read_exp () =
     let loc = read() in
     let annotated_type = read() in
     let ast_root= match read() with
+
     | "self_dispatch" ->
       let id = read_id() in
       let exps = read_list read_exp in
       AST_Self_Dispatch(id, exps)
+
+    | "if" ->
+      let cond = read_exp() in
+      let then_branch = read_exp() in
+      let else_branch = read_exp() in
+      AST_If(cond, then_branch, else_branch)
+    | "while" ->  
+      let guard = read_exp() in
+      let body = read_exp() in
+      AST_While(guard, body)
+    | "block" ->
+      AST_Block(read_list read_exp)
+
+    | "new" ->
+      let _,t = read_id() in
+      AST_New(t)
+    | "isvoid" ->
+      let exp = read_exp() in
+      AST_Isvoid(exp)
+
     | "plus" -> 
       let exp1 = read_exp() in
       let exp2 = read_exp() in
@@ -249,14 +446,45 @@ let main () = begin
       let exp1 = read_exp() in
       let exp2 = read_exp() in
       AST_Divide(exp1,exp2)
+
+    | "lt" ->
+      let exp1 = read_exp() in
+      let exp2 = read_exp() in
+      AST_LessThan(exp1,exp2)
+    | "le" ->
+      let exp1 = read_exp() in
+      let exp2 = read_exp() in
+      AST_LessThanEqual(exp1,exp2)
+    | "eq" ->
+      let exp1 = read_exp() in
+      let exp2 = read_exp() in
+      AST_Equal(exp1,exp2)
+    | "not" ->
+      let exp = read_exp() in
+      AST_Not(exp)
+    | "negate" ->
+      let exp = read_exp() in
+      AST_Negate(exp)
+
     | "integer" ->
       let ival=read() in 
       AST_Int(ival)
+    | "string" ->
+      let sval=read() in 
+      AST_String(sval)
     | "identifier" -> 
       let _,ident = read_id () in
       AST_Variable(ident)
-    | "block" ->
-      AST_Block(read_list read_exp)
+    | "true" ->
+      AST_Bool("true")
+    | "false" ->
+      AST_Bool("false")
+
+    | "let" ->
+      let bindings = read_list read_binding in
+      let body = read_exp() in
+      AST_Let(bindings, body)
+
     | x -> (
       printf "expression kind unhandled: %s" x;
       exit 1
@@ -269,10 +497,16 @@ let main () = begin
     (* print expressions*)
     List.iter (fun x -> (match x 
     with
-   | TAC_Assign_Call (var, mname, e) -> 
+    | TAC_Assign (var, e) -> 
+        fprintf fout "%s <- %s\n" (match var with TAC_Variable(v) -> v) (match e with TAC_Variable(v) -> v)
+    | TAC_Assign_Call (var, mname, e) -> 
         fprintf fout "%s <- call %s %s\n" var mname (match e with TAC_Variable(v) -> v)  
-    | TAC_Assign_Int (v,i) -> 
-        fprintf fout "%s <- int %s\n" v i
+
+    | TAC_Assign_New (v, t) -> 
+        fprintf fout "%s <- new %s\n" v t
+    | TAC_Assign_IsVoid (v, e) -> 
+        fprintf fout "%s <- isvoid %s\n" v (match e with TAC_Variable(v) -> v)
+
     | TAC_Assign_Plus (v, e1, e2) -> 
         fprintf fout "%s <- + %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
     | TAC_Assign_Minus(v, e1, e2) -> 
@@ -281,26 +515,52 @@ let main () = begin
         fprintf fout "%s <- * %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
     | TAC_Assign_Divide(v, e1, e2) -> 
         fprintf fout "%s <- / %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
+        
+
+
+    | TAC_Assign_LessThan(v, e1, e2) -> 
+        fprintf fout "%s <- < %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable
+        (v) -> v)
+    | TAC_Assign_LessThanEqual(v, e1, e2) -> 
+        fprintf fout "%s <- <= %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
+    | TAC_Assign_Equal(v, e1, e2) -> 
+        fprintf fout "%s <- = %s %s\n" v (match e1 with TAC_Variable(v) -> v) (match e2 with TAC_Variable(v) -> v)
+
+    | TAC_Assign_Not (v, e) -> 
+        fprintf fout "%s <- not %s\n" v (match e with TAC_Variable(v) -> v)
+    | TAC_Assign_Negate (v, e) -> 
+        fprintf fout "%s <- ~ %s\n" v (match e with TAC_Variable(v) -> v)
+    
+
+    | TAC_Assign_Int (v,i) -> 
+        fprintf fout "%s <- int %s\n" v i
+    | TAC_Assign_Bool (v,b) -> 
+      fprintf fout "%s <- bool %s\n" v b
+    | TAC_Assign_String (v,s) ->
+      fprintf fout "%s <- string\n%s\n" v s
+    | TAC_Bt (v, label) ->
+        fprintf fout "bt %s %s\n" (match v with TAC_Variable(v) -> v) label
+    | TAC_Jmp (label) ->
+        fprintf fout "jmp %s\n" label
+    (* this is the START of a label, not reference it from somewhere else.*)
+    | TAC_Label (label) ->
+        fprintf fout "label %s\n" label
     ) ) instructions;
     fprintf fout "return %s\n" (match expression with TAC_Variable(v) -> v); 
   in
   (* go through ast and print TAC *)
   let ast = read_aast() in
-  fprintf fout "comment start\n";
   List.iter (fun x -> (match x
   with
   | ((_,cname), _ , features) -> 
       List.iter(fun x -> (match x
       with
       | Attribute(fname, ftype, Some(finit)) -> 
-        (* fprintf fout "attribute, need to handle later\n"; *)
         ()
       | Method((_,mname), formals, mtype, mbody) -> 
-        fprintf fout "label %s_%s_0\n" cname mname;
-        (* convert method body to TAC *)
         let _ = counter := 0 in
         let instructions, expression = convert mbody in
-        print_tac instructions expression;
+        print_tac ([TAC_Label(fresh_label())] @ instructions) expression;
       | _ -> ()
       ) ) features; 
       
