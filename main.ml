@@ -29,6 +29,7 @@ and exp =
   | AST_Assign of id * exp (* let i : Int <- 0 *)
 
   | AST_Self_Dispatch of id * (exp list)
+  | AST_Dynamic_Dispatch of id * (exp list) 
   (*
   1. guard
   2. then
@@ -168,20 +169,38 @@ let main () = begin
       [TAC_Assign_Default(TAC_Variable(new_var), typ)], TAC_Variable(new_var)
     ) 
       
+    | AST_Assign ((_,id), exp) ->( 
+      let instr, ret = convert exp in
+      
+      let found_var = try
+        Hashtbl.find var_map id
+      with Not_found -> 
+        failwith "um what\n";
+      in
 
-    | AST_Self_Dispatch ((_,mname), exps) -> 
-      let instr, return_exp= List.fold_left (fun (acc_inst, acc_exp) exp -> 
+      let to_output = TAC_Assign(TAC_Variable(found_var), ret) in
+      (instr @ [to_output]), TAC_Variable(found_var)
+    )
+    | AST_Self_Dispatch ((_,mname), exps) | AST_Dynamic_Dispatch((_,mname),exps)-> 
+
+      let instr, return_exp = List.fold_left (fun (acc_inst, acc_exp) exp -> 
         (* extract instructions and return value *)
         let inst, expr = convert exp in
         (acc_inst @ inst, acc_exp @ [expr])
       ) ([], []) exps in
-      (*hmm*)
-      let last_return_exp= List.hd (List.rev return_exp) in
+
+      let last_return_exp = match List.rev return_exp with
+        | hd::_ -> Some(hd)
+        | _ -> None 
+      in
       let new_var = fresh_var () in
       (* t0 <- call out_int t1  (just have to match t1) *)
-      let to_output = TAC_Assign_Call(new_var,mname,last_return_exp) in
+      let to_output = match last_return_exp with
+        | Some(expr) -> TAC_Assign_Call(new_var, mname, expr)
+        | None -> TAC_Assign_Call(new_var, mname, TAC_Variable(""))
+      in
       (instr@ [to_output]), TAC_Variable(new_var)
-   
+  
     | AST_If(cond, then_branch, else_branch) ->
       (* get tac instructions, and var for these.*)
       let cond_instr, cond_var = convert cond in
@@ -201,16 +220,32 @@ let main () = begin
 
     | AST_While(cond, body) ->
       (* get tac instructions, and var for these.*)
+      (*
+      cond_instr is the list of tac instructions for the conditional.
+      *)
       let cond_instr, cond_var = convert cond in
       let body_instr, body_var = convert body in
 
       let while_label = fresh_label () in
+      let body_label = fresh_label () in
       let join_label = fresh_label () in
 
-      let bt_instr = TAC_Bt(cond_var, while_label) in
+      (*
+      if the temporary variable for conditional is true, jump to body_label.
+      *)
+      let bt_instr = TAC_Bt(cond_var, body_label) in
+      let jmp_while = TAC_Jmp(while_label) in
       let jmp_join = TAC_Jmp(join_label) in
-      (TAC_Label while_label :: cond_instr @ [bt_instr; jmp_join] 
-      @ body_instr @ [jmp_join; TAC_Label join_label]), body_var
+
+      (*
+      do conditional instruction,
+      if conditional is true, jump to body label
+      else, jump to join label
+    in body label, do body instructions and then jump to while. repeat.
+      *)
+      (TAC_Label while_label :: cond_instr @ [bt_instr; jmp_join; TAC_Label body_label] 
+      @ body_instr @ [jmp_while; TAC_Label join_label]), body_var
+      
     | AST_Block(v) -> 
       (* 
       accumualte instructions for each instruction in the block,
@@ -350,7 +385,10 @@ let main () = begin
 
       (binding_instr @ body_instr), body_ret
 
-    | _ -> failwith "not implemented"
+    | _ ->(
+      printf "expression not handled in AST. \n";
+      exit 1
+    ) 
   
     end in
 
@@ -463,11 +501,6 @@ let main () = begin
 
 
 
-
-
-
-
-
   (* READ AST NODES *)
   and read_exp () =
     let loc = read() in
@@ -478,10 +511,19 @@ let main () = begin
       let id = read_id() in
       let exp = read_exp() in
       AST_Assign(id, exp)
+
+
     | "self_dispatch" ->
       let id = read_id() in
       let exps = read_list read_exp in
       AST_Self_Dispatch(id, exps)
+    
+    | "dynamic_dispatch" ->
+      let exp = read_exp() in
+      let id = read_id() in
+      let exps = read_list read_exp in
+      AST_Dynamic_Dispatch(id, exps)
+
 
     | "if" ->
       let cond = read_exp() in
