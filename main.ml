@@ -21,9 +21,14 @@ and formal = id * cool_type
 
 and binding = id * cool_type * (exp option) 
 and case_element = id * cool_type * exp 
-and exp = 
-  | AST_Self_Dispatch of id * (exp list)
 
+
+(* AST NODES *)
+and exp = 
+  
+  | AST_Assign of id * exp (* let i : Int <- 0 *)
+
+  | AST_Self_Dispatch of id * (exp list)
   (*
   1. guard
   2. then
@@ -50,14 +55,22 @@ and exp =
 
   | AST_Int of string 
   | AST_String of string
+
   | AST_Variable of string
+  | AST_Default of string (* is this actually needed? *)
+
   | AST_Bool of string
 
   | AST_Let of binding list * exp
 
 and
+
+
+
 (* what we will output (as TAC) *)
+(* TAC INSTRUCTIONS *)
 tac_instr = 
+| TAC_Assign_Default of tac_expr * string (* t$0 <- default Int *)
 | TAC_Assign of tac_expr * tac_expr (* t$0 <- t$1 *)
 | TAC_Assign_Call of  string * string * tac_expr(* t$0 <- call out_int t$1 *)
 
@@ -96,10 +109,19 @@ tac_instr =
 | TAC_Jmp of string (* jmp Main_main_0 *)
 | TAC_Label of string (* label Main_main_1 *)
 
-
 and
 tac_expr =
 | TAC_Variable of string
+
+
+(*
+  map var to temporary variables
+  for example, map the variable "x" in the source code to t$0.
+*)
+
+type symbol_table = (string,string) Hashtbl.t
+let var_map : symbol_table = Hashtbl.create 100
+
 
 let counter = ref 0 
 let label_counter = ref 0
@@ -122,16 +144,30 @@ let main () = begin
     "confusingly_named_label_" ^ (string_of_int l)
   in
 
+
   (*
-  convert expressions in ast to TAC instructions
+  CONVERT EXPRESSIONS TO TAC INSTRUCTIONS 
 
   return list of instructions and
-  the returned variable 
+  the return variable 
+  i.e, we do a bunch of stuff (first list of instructions),
+  and then store it in a variable (the second part of the tuple)
   *)
   let rec convert ast = begin
     match ast with
-    | AST_Variable (v) -> [], TAC_Variable(v)
-    
+    | AST_Variable (v) -> (
+      (* get the corresponding temp from data structure.*)
+      try
+        let stored_var = Hashtbl.find var_map v in
+        [], TAC_Variable(stored_var)
+      with Not_found ->
+        [], TAC_Variable(v)
+      )
+    | AST_Default (typ) ->(
+      let new_var = fresh_var () in
+      [TAC_Assign_Default(TAC_Variable(new_var), typ)], TAC_Variable(new_var)
+    ) 
+      
 
     | AST_Self_Dispatch ((_,mname), exps) -> 
       let instr, return_exp= List.fold_left (fun (acc_inst, acc_exp) exp -> 
@@ -271,37 +307,55 @@ let main () = begin
       (i1@[to_output]), TAC_Variable(new_var)
 
     | AST_Let(bindings, body) ->
-      (* this is broken... *)
-      (* 
-      let bindings = read_list read_binding in
-      let body = read_exp() in
-      *)
-      let rec convert_let lst =
+      (* Generate TAC and the return values for all expressions in lst. *)
+      let rec convert_bindings lst =
         match lst with
         | [] -> failwith "empty let"
-        | [x] -> convert x
+        | [x] -> 
+          let instr, ret = convert x in
+          instr, [ret]
         | hd::tl -> 
           let i1, t1 = convert hd in
-          let i2, t2 = convert_let tl in
-          i1@i2, t2
+          let i2, t2 = convert_bindings tl in
+          i1 @ i2, [t1] @ t2
       in
-      let bindings_as_exps = List.map (fun ((_,id), typ, exp_opt) -> 
+
+      (*
+       bindings to expressions
+       for example, AST_Int
+        *)
+      let bindings_as_exps = List.map (fun ((_,id), (_,typ), exp_opt) -> 
         match exp_opt with
         | Some(exp) -> exp
-        | None -> AST_Variable(id) (* TODO: DEFAULT *)
+        | None -> AST_Default(typ) (* DEFAULT *)
       ) bindings in
 
-      let instr, ret = convert_let bindings_as_exps in
+      let binding_instr, binding_rets = convert_bindings bindings_as_exps in
 
-      let new_var1 = fresh_var () in
-      let assign = TAC_Assign(TAC_Variable(new_var1),ret) in
+      (*
+       map variables with their corresponding temporary varibales.
+      binding_rets comes from recursively adding the expressions in convert_bindings 
+       *)
+      List.iter2 (fun ((_,id), _, _) ret -> 
+        Hashtbl.add var_map id (match ret with TAC_Variable(v) -> v)
+      ) bindings binding_rets;
 
-      (*body needs access to the new variable from assign*)
-      let binstr , bexp = convert body in
-      (instr@  [assign] @ binstr ), bexp
+      (* need to use that data structure that converts variables to temporaries *)
+      let body_instr, body_ret = convert body in
+
+      (* IMPORTANT: after converting body, we need to ensure that the variables are deallocated from the table. *)
+      List.iter (fun ((_,id), _, _) -> 
+        Hashtbl.remove var_map id
+      ) bindings;
+
+      (binding_instr @ body_instr), body_ret
+
     | _ -> failwith "not implemented"
   
     end in
+
+
+
 
   let fname = Sys.argv.(1) in
   let fin = open_in fname in 
@@ -327,6 +381,7 @@ let main () = begin
     let lst = range (k*2) in
     List.map(fun _ -> worker()) lst
   in
+
   (* let rec read_method_body () =
     read_exp() *)
   let rec read_aast() = 
@@ -384,16 +439,19 @@ let main () = begin
     let fname = read_id () in
     let ftype = read_id() in
   (fname, ftype)
+
   and read_binding () =
     match read() with
     | "let_binding_no_init" ->
       let bname = read_id() in
       let btype = read_id() in
+      (* printf "reading let binding %s\n" (snd bname); *)
       (bname,btype,None)
     | "let_binding_init" ->
       let bname = read_id() in
       let btype = read_id() in
       let bval = read_exp() in
+      (* printf "reading let binding %s\n" (snd bname); *)
       (bname,btype,Some(bval))
     | x -> failwith("error reading let binding:" ^x)
   (* and read_case_element() = 
@@ -401,11 +459,25 @@ let main () = begin
     let cetype = read_id() in
     let cebody = read_exp() in
     (cevar,cetype,cebody)  *)
+
+
+
+
+
+
+
+
+
+  (* READ AST NODES *)
   and read_exp () =
     let loc = read() in
     let annotated_type = read() in
     let ast_root= match read() with
 
+    | "assign" -> 
+      let id = read_id() in
+      let exp = read_exp() in
+      AST_Assign(id, exp)
     | "self_dispatch" ->
       let id = read_id() in
       let exps = read_list read_exp in
@@ -474,6 +546,7 @@ let main () = begin
       AST_String(sval)
     | "identifier" -> 
       let _,ident = read_id () in
+      (* printf "reading identifier %s\n" ident; *)
       AST_Variable(ident)
     | "true" ->
       AST_Bool("true")
@@ -492,6 +565,13 @@ let main () = begin
     in 
     ast_root
   in
+
+
+
+
+
+
+  (* PRINT TAC INSTRUCTIONS *)
   let rec print_tac instructions expression = 
     (* let instructions, expression = convert method_body in *)
     (* print expressions*)
@@ -499,6 +579,8 @@ let main () = begin
     with
     | TAC_Assign (var, e) -> 
         fprintf fout "%s <- %s\n" (match var with TAC_Variable(v) -> v) (match e with TAC_Variable(v) -> v)
+    | TAC_Assign_Default (var, typ) -> 
+        fprintf fout "%s <- default %s\n" (match var with TAC_Variable(v) -> v) typ
     | TAC_Assign_Call (var, mname, e) -> 
         fprintf fout "%s <- call %s %s\n" var mname (match e with TAC_Variable(v) -> v)  
 
@@ -547,6 +629,11 @@ let main () = begin
         fprintf fout "label %s\n" label
     ) ) instructions;
     fprintf fout "return %s\n" (match expression with TAC_Variable(v) -> v); 
+
+
+
+
+
   in
   (* go through ast and print TAC *)
   let ast = read_aast() in
