@@ -4,3 +4,7 @@
 *.cmi
 *.cmo
 *.cl
+*.cl-input
+*.out
+examples
+testcases
