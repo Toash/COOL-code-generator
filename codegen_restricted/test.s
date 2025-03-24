@@ -63,12 +63,14 @@ String..vtable:         ## virtual function table for String
 Bool..new:              ## constructor for Bool
                         pushq %rbp
                         movq %rsp, %rbp
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         movq $4, %r12
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r12, %rdi
 			call calloc
 			movq %rax, %r12
@@ -94,12 +96,14 @@ Bool..new:              ## constructor for Bool
 IO..new:                ## constructor for IO
                         pushq %rbp
                         movq %rsp, %rbp
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         movq $3, %r12
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r12, %rdi
 			call calloc
 			movq %rax, %r12
@@ -120,12 +124,14 @@ IO..new:                ## constructor for IO
 Int..new:               ## constructor for Int
                         pushq %rbp
                         movq %rsp, %rbp
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         movq $4, %r12
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r12, %rdi
 			call calloc
 			movq %rax, %r12
@@ -151,12 +157,14 @@ Int..new:               ## constructor for Int
 Main..new:              ## constructor for Main
                         pushq %rbp
                         movq %rsp, %rbp
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         movq $3, %r12
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r12, %rdi
 			call calloc
 			movq %rax, %r12
@@ -177,12 +185,14 @@ Main..new:              ## constructor for Main
 Object..new:            ## constructor for Object
                         pushq %rbp
                         movq %rsp, %rbp
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         movq $3, %r12
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r12, %rdi
 			call calloc
 			movq %rax, %r12
@@ -203,12 +213,14 @@ Object..new:            ## constructor for Object
 String..new:            ## constructor for String
                         pushq %rbp
                         movq %rsp, %rbp
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         movq $4, %r12
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r12, %rdi
 			call calloc
 			movq %rax, %r12
@@ -235,15 +247,19 @@ Object.abort:           ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
                         movq $string7, %r13
-                        movq %r13, %rdi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
 			call cooloutstr
-                        movl $0, %edi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movl $0, %edi
 			call exit
 .globl Object.abort.end
 Object.abort.end:       ## method body ends
@@ -257,13 +273,15 @@ Object.copy:            ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
                         movq 8(%r12), %r14
-                        movq $8, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $8, %rsi
 			movq %r14, %rdi
 			call calloc
 			movq %rax, %r13
@@ -294,8 +312,8 @@ Object.type_name:       ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
@@ -323,8 +341,8 @@ IO.in_int:              ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
@@ -336,7 +354,7 @@ IO.in_int:              ## method definition
                         popq %r12
                         popq %rbp
                         movq %r13, %r14
-                        movl	$1, %esi
+                        			movl	$1, %esi
 			movl $4096, %edi
 			call calloc
 			pushq %rax
@@ -371,8 +389,8 @@ IO.in_string:           ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
@@ -384,7 +402,9 @@ IO.in_string:           ## method definition
                         popq %r12
                         popq %rbp
                         movq %r13, %r14
-                        call coolgetstr 
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			call coolgetstr 
 			movq %rax, %r13
                         movq %r13, 24(%r14)
                         movq %r14, %r13
@@ -400,18 +420,20 @@ IO.out_int:             ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## fp[3] holds argument x (Int)
                         ## method body begins
                         movq 24(%rbp), %r14
                         movq 24(%r14), %r13
-                        movq $percent.d, %rdi
-		movl %r13d, %eax
-		cdqe
-		movq %rax, %rsi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq $percent.d, %rdi
+			movl %r13d, %eax
+			cdqe
+			movq %rax, %rsi
 			movl $0, %eax
 			call printf
                         movq %r12, %r13
@@ -427,15 +449,17 @@ IO.out_string:          ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## fp[3] holds argument x (String)
                         ## method body begins
                         movq 24(%rbp), %r14
                         movq 24(%r14), %r13
-                        movq %r13, %rdi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
 			call cooloutstr
                         movq %r12, %r13
 .globl IO.out_string.end
@@ -455,48 +479,25 @@ Main.main:              ## method definition
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
-                        ## out_int(...)
+                        ## out_string(...)
                         pushq %r12
                         pushq %rbp
-                        ## new Int
+                        ## new String
                         pushq %rbp
                         pushq %r12
-                        movq $Int..new, %r14
+                        movq $String..new, %r14
                         call *%r14
                         popq %r12
                         popq %rbp
-                        movq $1, %r14
-                        movq %r14, 24(%r13)
-                        movq 24(%r13), %r13
-                        movq %r13, 0(%rbp)
-                        ## new Int
-                        pushq %rbp
-                        pushq %r12
-                        movq $Int..new, %r14
-                        call *%r14
-                        popq %r12
-                        popq %rbp
-                        movq $1, %r14
-                        movq %r14, 24(%r13)
-                        movq 24(%r13), %r13
-                        movq 0(%rbp), %r14
-                        addq %r14, %r13
-                        movq %r13, 0(%rbp)
-                        ## new Int
-                        pushq %rbp
-                        pushq %r12
-                        movq $Int..new, %r14
-                        call *%r14
-                        popq %r12
-                        popq %rbp
-                        movq 0(%rbp), %r14
+                        ## string8 holds "Hello!\n"
+                        movq $string8, %r14
                         movq %r14, 24(%r13)
                         pushq %r13
                         pushq %r12
                         ## obtain vtable for self object of type Main
                         movq 16(%r12), %r14
-                        ## look up out_int() at offset 7 in vtable
-                        movq 56(%r14), %r14
+                        ## look up out_string() at offset 8 in vtable
+                        movq 64(%r14), %r14
                         call *%r14
                         addq $16, %rsp
                         popq %rbp
@@ -513,8 +514,8 @@ String.concat:          ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## fp[3] holds argument s (String)
@@ -530,7 +531,9 @@ String.concat:          ## method definition
                         movq 24(%rbp), %r14
                         movq 24(%r14), %r14
                         movq 24(%r12), %r13
-                        movq %r13, %rdi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
 			movq %r14, %rsi
 			call coolstrcat
 			movq %rax, %r13
@@ -548,8 +551,8 @@ String.length:          ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## method body begins
@@ -562,7 +565,9 @@ String.length:          ## method definition
                         popq %rbp
                         movq %r13, %r14
                         movq 24(%r12), %r13
-                        movq %r13, %rdi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
 			movl $0, %eax
 			call coolstrlen
 			movq %rax, %r13
@@ -580,8 +585,8 @@ String.substr:          ## method definition
                         pushq %rbp
                         movq %rsp, %rbp
                         movq 16(%rbp), %r12
-                        ## stack room for temporaries: 1
-                        movq $8, %r14
+                        ## stack room for temporaries: 2
+                        movq $16, %r14
                         subq %r14, %rsp
                         ## return address handling
                         ## fp[4] holds argument i (Int)
@@ -600,17 +605,23 @@ String.substr:          ## method definition
                         movq 32(%rbp), %r13
                         movq 24(%r13), %r13
                         movq 24(%r12), %r12
-                        movq %r12, %rdi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r12, %rdi
 			movq %r13, %rsi
 			movq %r14, %rdx
 			call coolsubstr
 			movq %rax, %r13
                         cmpq $0, %r13
 			jne l3
-                        movq $string8, %r13
-                        movq %r13, %rdi
+                        movq $string9, %r13
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
 			call cooloutstr
-                        movl $0, %edi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movl $0, %edi
 			call exit
 .globl l3
 l3:                     movq %r13, 24(%r15)
@@ -703,7 +714,19 @@ string7:                # "abort\\n"
 .byte 0
 
 .globl string8
-string8:                # "ERROR: 0: Exception: String.substr out of range\\n"
+string8:                # "Hello!\\n"
+.byte  72 # 'H'
+.byte 101 # 'e'
+.byte 108 # 'l'
+.byte 108 # 'l'
+.byte 111 # 'o'
+.byte  33 # '!'
+.byte  92 # '\\'
+.byte 110 # 'n'
+.byte 0
+
+.globl string9
+string9:                # "ERROR: 0: Exception: String.substr out of range\\n"
 .byte  69 # 'E'
 .byte  82 # 'R'
 .byte  82 # 'R'
@@ -828,12 +851,13 @@ eq_string:              ## two Strings
                         movq 24(%rbp), %r14
                         movq 24(%r13), %r13
                         movq 24(%r14), %r14
-                        
-  movq %r13, %rdi
-  movq %r14, %rsi
-  call strcmp 
-  cmp $0, %eax
-  je eq_true
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
+			movq %r14, %rsi
+			call strcmp 
+			cmp $0, %eax
+			je eq_true
                         jmp eq_false
 .globl eq_end
 eq_end:                 ## return address handling
@@ -913,12 +937,13 @@ le_string:              ## two Strings
                         movq 24(%rbp), %r14
                         movq 24(%r13), %r13
                         movq 24(%r14), %r14
-                        
-  movq %r13, %rdi
-  movq %r14, %rsi
-  call strcmp 
-  cmp $0, %eax
-  jle le_true
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
+			movq %r14, %rsi
+			call strcmp 
+			cmp $0, %eax
+			jle le_true
                         jmp le_false
 .globl le_end
 le_end:                 ## return address handling
@@ -992,12 +1017,13 @@ lt_string:              ## two Strings
                         movq 24(%rbp), %r14
                         movq 24(%r13), %r13
                         movq 24(%r14), %r14
-                        
-  movq %r13, %rdi
-  movq %r14, %rsi
-  call strcmp 
-  cmp $0, %eax
-  jl lt_true
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
+			movq %r14, %rsi
+			call strcmp 
+			cmp $0, %eax
+			jl lt_true
                         jmp lt_false
 .globl lt_end
 lt_end:                 ## return address handling
@@ -1017,14 +1043,17 @@ main:
                         pushq %r13
                         movq $Main.main, %r14
                         call *%r14
-                        movl $0, %edi
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movl $0, %edi
 			call exit
                         
-.globl cooloutstr
+	.globl	cooloutstr
 	.type	cooloutstr, @function
 cooloutstr:
-.LFB0:
+.LFB6:
 	.cfi_startproc
+	endbr64
 	pushq	%rbp
 	.cfi_def_cfa_offset 16
 	.cfi_offset 6, -16
@@ -1036,76 +1065,84 @@ cooloutstr:
 	jmp	.L2
 .L5:
 	movl	-4(%rbp), %eax
-	cltq
-	addq	-24(%rbp), %rax
+	movslq	%eax, %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
 	movzbl	(%rax), %eax
 	cmpb	$92, %al
 	jne	.L3
 	movl	-4(%rbp), %eax
 	cltq
-	addq	$1, %rax
-	addq	-24(%rbp), %rax
+	leaq	1(%rax), %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
 	movzbl	(%rax), %eax
 	cmpb	$110, %al
 	jne	.L3
 	movq	stdout(%rip), %rax
 	movq	%rax, %rsi
 	movl	$10, %edi
-	call	fputc
+	call	fputc@PLT
 	addl	$2, -4(%rbp)
 	jmp	.L2
 .L3:
 	movl	-4(%rbp), %eax
-	cltq
-	addq	-24(%rbp), %rax
+	movslq	%eax, %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
 	movzbl	(%rax), %eax
 	cmpb	$92, %al
 	jne	.L4
 	movl	-4(%rbp), %eax
 	cltq
-	addq	$1, %rax
-	addq	-24(%rbp), %rax
+	leaq	1(%rax), %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
 	movzbl	(%rax), %eax
 	cmpb	$116, %al
 	jne	.L4
 	movq	stdout(%rip), %rax
 	movq	%rax, %rsi
 	movl	$9, %edi
-	call	fputc
+	call	fputc@PLT
 	addl	$2, -4(%rbp)
 	jmp	.L2
 .L4:
 	movq	stdout(%rip), %rdx
 	movl	-4(%rbp), %eax
-	cltq
-	addq	-24(%rbp), %rax
+	movslq	%eax, %rcx
+	movq	-24(%rbp), %rax
+	addq	%rcx, %rax
 	movzbl	(%rax), %eax
 	movsbl	%al, %eax
 	movq	%rdx, %rsi
 	movl	%eax, %edi
-	call	fputc
+	call	fputc@PLT
 	addl	$1, -4(%rbp)
 .L2:
 	movl	-4(%rbp), %eax
-	cltq
-	addq	-24(%rbp), %rax
+	movslq	%eax, %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
 	movzbl	(%rax), %eax
 	testb	%al, %al
 	jne	.L5
 	movq	stdout(%rip), %rax
 	movq	%rax, %rdi
-	call	fflush
+	call	fflush@PLT
+	nop
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE0:
+.LFE6:
 	.size	cooloutstr, .-cooloutstr
-.globl coolstrlen
+	.globl	coolstrlen
 	.type	coolstrlen, @function
 coolstrlen:
-.LFB1:
+.LFB7:
 	.cfi_startproc
+	endbr64
 	pushq	%rbp
 	.cfi_def_cfa_offset 16
 	.cfi_offset 6, -16
@@ -1120,27 +1157,29 @@ coolstrlen:
 	movl	%eax, -4(%rbp)
 .L7:
 	movl	-4(%rbp), %eax
-	mov	%eax, %eax
-	addq	-24(%rbp), %rax
+	movl	%eax, %edx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
 	movzbl	(%rax), %eax
 	testb	%al, %al
 	jne	.L8
 	movl	-4(%rbp), %eax
-	leave
+	popq	%rbp
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE1:
+.LFE7:
 	.size	coolstrlen, .-coolstrlen
 	.section	.rodata
 .LC0:
 	.string	"%s%s"
 	.text
-.globl coolstrcat
+	.globl	coolstrcat
 	.type	coolstrcat, @function
 coolstrcat:
-.LFB2:
+.LFB8:
 	.cfi_startproc
+	endbr64
 	pushq	%rbp
 	.cfi_def_cfa_offset 16
 	.cfi_offset 6, -16
@@ -1148,19 +1187,19 @@ coolstrcat:
 	.cfi_def_cfa_register 6
 	pushq	%rbx
 	subq	$40, %rsp
+	.cfi_offset 3, -24
 	movq	%rdi, -40(%rbp)
 	movq	%rsi, -48(%rbp)
 	cmpq	$0, -40(%rbp)
-	jne	.L10
-	.cfi_offset 3, -24
+	jne	.L11
 	movq	-48(%rbp), %rax
-	jmp	.L11
-.L10:
+	jmp	.L12
+.L11:
 	cmpq	$0, -48(%rbp)
-	jne	.L12
+	jne	.L13
 	movq	-40(%rbp), %rax
-	jmp	.L11
-.L12:
+	jmp	.L12
+.L13:
 	movq	-40(%rbp), %rax
 	movq	%rax, %rdi
 	call	coolstrlen
@@ -1168,99 +1207,101 @@ coolstrcat:
 	movq	-48(%rbp), %rax
 	movq	%rax, %rdi
 	call	coolstrlen
-	leal	(%rbx,%rax), %eax
+	addl	%ebx, %eax
 	addl	$1, %eax
-	movl	%eax, -20(%rbp)
-	movl	-20(%rbp), %eax
+	movl	%eax, -28(%rbp)
+	movl	-28(%rbp), %eax
 	cltq
 	movl	$1, %esi
 	movq	%rax, %rdi
-	call	calloc
-	movq	%rax, -32(%rbp)
-	movl	$.LC0, %edx
-	movl	-20(%rbp), %eax
-	movslq	%eax, %rbx
-	movq	-48(%rbp), %rsi
-	movq	-40(%rbp), %rcx
-	movq	-32(%rbp), %rax
-	movq	%rsi, %r8
-	movq	%rbx, %rsi
+	call	calloc@PLT
+	movq	%rax, -24(%rbp)
+	movl	-28(%rbp), %eax
+	movslq	%eax, %rsi
+	movq	-48(%rbp), %rcx
+	movq	-40(%rbp), %rdx
+	movq	-24(%rbp), %rax
+	movq	%rcx, %r8
+	movq	%rdx, %rcx
+	leaq	.LC0(%rip), %rdx
 	movq	%rax, %rdi
 	movl	$0, %eax
-	call	snprintf
-	movq	-32(%rbp), %rax
-.L11:
-	addq	$40, %rsp
-	popq	%rbx
+	call	snprintf@PLT
+	movq	-24(%rbp), %rax
+.L12:
+	movq	-8(%rbp), %rbx
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE2:
+.LFE8:
 	.size	coolstrcat, .-coolstrcat
 	.section	.rodata
 .LC1:
 	.string	""
 	.text
-.globl coolgetstr
+	.globl	coolgetstr
 	.type	coolgetstr, @function
 coolgetstr:
-.LFB3:
+.LFB9:
 	.cfi_startproc
+	endbr64
 	pushq	%rbp
 	.cfi_def_cfa_offset 16
 	.cfi_offset 6, -16
 	movq	%rsp, %rbp
 	.cfi_def_cfa_register 6
-	subq	$32, %rsp
+	subq	$16, %rsp
 	movl	$1, %esi
 	movl	$40960, %edi
-	call	calloc
-	movq	%rax, -16(%rbp)
-	movl	$0, -4(%rbp)
-.L20:
+	call	calloc@PLT
+	movq	%rax, -8(%rbp)
+	movl	$0, -16(%rbp)
+.L21:
 	movq	stdin(%rip), %rax
 	movq	%rax, %rdi
-	call	fgetc
-	movl	%eax, -20(%rbp)
-	cmpl	$-1, -20(%rbp)
-	je	.L14
-	cmpl	$10, -20(%rbp)
-	jne	.L15
-.L14:
-	cmpl	$0, -4(%rbp)
-	je	.L16
-	movl	$.LC1, %eax
-	jmp	.L17
-.L16:
-	movq	-16(%rbp), %rax
-	jmp	.L17
+	call	fgetc@PLT
+	movl	%eax, -12(%rbp)
+	cmpl	$-1, -12(%rbp)
+	je	.L15
+	cmpl	$10, -12(%rbp)
+	jne	.L16
 .L15:
-	cmpl	$0, -20(%rbp)
-	jne	.L18
-	movl	$1, -4(%rbp)
-	jmp	.L20
-.L18:
-	movq	-16(%rbp), %rax
+	cmpl	$0, -16(%rbp)
+	je	.L17
+	leaq	.LC1(%rip), %rax
+	jmp	.L18
+.L17:
+	movq	-8(%rbp), %rax
+	jmp	.L18
+.L16:
+	cmpl	$0, -12(%rbp)
+	jne	.L19
+	movl	$1, -16(%rbp)
+	jmp	.L21
+.L19:
+	movq	-8(%rbp), %rax
 	movq	%rax, %rdi
 	call	coolstrlen
-	mov	%eax, %eax
-	addq	-16(%rbp), %rax
-	movl	-20(%rbp), %edx
+	movl	%eax, %edx
+	movq	-8(%rbp), %rax
+	addq	%rdx, %rax
+	movl	-12(%rbp), %edx
 	movb	%dl, (%rax)
-	jmp	.L20
-.L17:
+	jmp	.L21
+.L18:
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE3:
+.LFE9:
 	.size	coolgetstr, .-coolgetstr
-.globl coolsubstr
+	.globl	coolsubstr
 	.type	coolsubstr, @function
 coolsubstr:
-.LFB4:
+.LFB10:
 	.cfi_startproc
+	endbr64
 	pushq	%rbp
 	.cfi_def_cfa_offset 16
 	.cfi_offset 6, -16
@@ -1275,31 +1316,32 @@ coolsubstr:
 	call	coolstrlen
 	movl	%eax, -4(%rbp)
 	cmpq	$0, -32(%rbp)
-	js	.L22
+	js	.L23
 	cmpq	$0, -40(%rbp)
-	js	.L22
-	movq	-40(%rbp), %rax
+	js	.L23
 	movq	-32(%rbp), %rdx
+	movq	-40(%rbp), %rax
 	addq	%rax, %rdx
 	movl	-4(%rbp), %eax
 	cltq
 	cmpq	%rax, %rdx
-	jle	.L23
-.L22:
-	movl	$0, %eax
-	jmp	.L24
+	jle	.L24
 .L23:
-	movq	-40(%rbp), %rdx
-	movq	-32(%rbp), %rax
-	addq	-24(%rbp), %rax
-	movq	%rdx, %rsi
-	movq	%rax, %rdi
-	call	strndup
+	movl	$0, %eax
+	jmp	.L25
 .L24:
+	movq	-40(%rbp), %rax
+	movq	-32(%rbp), %rcx
+	movq	-24(%rbp), %rdx
+	addq	%rcx, %rdx
+	movq	%rax, %rsi
+	movq	%rdx, %rdi
+	call	strndup@PLT
+.L25:
 	leave
 	.cfi_def_cfa 7, 8
 	ret
 	.cfi_endproc
-.LFE4:
+.LFE10:
 	.size	coolsubstr, .-coolsubstr
 
