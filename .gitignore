@@ -8,3 +8,6 @@
 *.out
 examples
 testcases
+
+# for reference
+ignore
