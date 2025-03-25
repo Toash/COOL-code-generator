@@ -328,22 +328,31 @@ def main():
         return None
             
     # emit stack instructions
+    """
+    IMPORTANT REGISTERS:
+    %rbp - base pointer
+    %r12 - ?
+    """
     def cgen(expr):
         # comparing against the namedtuples we defined earlier.
         if isinstance(expr, Integer):
-            emit("# Integer literal")
-            emit("li", "r2", str(expr.Integer))
+            emit(";; new Int")
 
-            emit("push", "fp")
-            emit("push", "r0")
-            emit("la", "r2","Int..new")
-            emit("call", "r2")
-            emit("pop","r0")
-            emit("pop","fp")
+            emit("pushq", "%rbp") # save base pointer
+            emit("pushq", "r12") # what is r12 for?
 
-            emit("li","r2",str(expr.Integer))
-            emit("st","r1[3]","r2") #?
-            # r1 has int object
+            # $Int..new is the location for the int constuctor
+            emit("movq","$Int..new","%r14") 
+            # jump to location
+            emit("call", "*%r14")
+
+            emit("popq","%r12")
+            emit("popq","%rbp")
+            #?
+            emit("movq","$1,%r14")
+            emit("movq","%r14,24(%r13)")
+
+
 
         # elif isinstance(expr, Dynamic_Dispatch):
         #     cgen(expr.Args[0][1]) # receiver
@@ -358,15 +367,17 @@ def main():
 
         #TODO: handle operational semantics for self dispatch
         # for this checkpoint, we only need to consider it for in_out
-
+        
         else:
             emit(f"TODO: Unhandled expression type: {type(expr).__name__}")
 
-    # classes and their attributes
+    # explicitly defined classes and their attributes
     class_map = {}
-    # how the methods are actually implemented
+    # Defines classes and their methods
+    # takes into account overriding
     imp_map = {}
-    # inheritance hierarch
+    # inheritance hierarchy
+    # parent child relationship
     parent_map = {} 
 
     # parse / deserialize the .cl-type file from the semantic analyzer, populate these
@@ -374,38 +385,51 @@ def main():
     read_imp_map()
     read_parent_map()
 
-    from pprint import pprint
+    # need to print constructors of internal methods
+
+
+    # from pprint import pprint
     # print(class_map)
-    pprint(imp_map)
+    # pprint(imp_map)
     # print(parent_map)
     cls= "Main"
     method="main"
     formals = imp_map[(cls,method)][:-1]
     body = imp_map[(cls,method)][-1]
 
+    # TODO: generalizei methods
     emit_label("Main.main")
-    emit("mov", "fp", "sp")
-    emit("pop", "r0")
-    emit("li", "r2", "1")
-    emit("sub", "sp", "sp", "r2")
-    emit("push", "ra")
+    emit(";; method definition")
+    emit("pushq","%rbp") # save old base pointer
+    emit("movq","%rsp","%rbp") # new stack frame for main
+    emit("movq","16(%rbp)","%r12") # ?
+
+
+    emit(";; stack room for temporaries: 1")
+    emit("movq","$8","%r14") # move offset into register? why?
+    emit("subq","%r14","%rsp") # allocate stack frame
 
     # # CALL TO EXPRESSION GENERATOR
     cgen(body[1])  # body is (loc, ekind), so use ekind
 
+    # TODO: generalize ending of methods
     emit_label("Main.main.end")
-    emit("pop", "ra")
-    emit("li", "r2", str(len(formals) + 1))
-    emit("add", "sp", "sp", "r2")
-    emit("return")
-    
+    # why are these needed?
+    emit("movq","%rbp","%rsp") 
+    emit("popq","%rbp") 
+    emit("ret")
+
     # start generating stack instructions 
     print("hello!")
-    for inst in instructions:
-        if(isinstance(inst,str)):
-            print(inst)
-        else:
-            print(f"{inst.opcode} {' '.join(inst.args)}")
+    with open("output.s","w") as file:
+        for inst in instructions:
+            if(isinstance(inst,str)):
+                file.write(inst)
+                file.write("\n")
+            else:
+                file.write("\t")
+                file.write(f"{inst.opcode} {' '.join(inst.args)}")
+                file.write("\n")
 
 main()
 
