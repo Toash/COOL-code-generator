@@ -6,6 +6,8 @@
 *.cl
 *.cl-input
 *.out
+*.cl-asm
+*.s
 examples
 testcases
 
