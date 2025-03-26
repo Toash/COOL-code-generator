@@ -3,7 +3,7 @@
 *.cl-type
 *.cmi
 *.cmo
-*.cl
+#*.cl
 *.cl-input
 *.out
 *.cl-asm
