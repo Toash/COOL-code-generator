@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""
+Generate TAC
+"""
+
+import sys
+from collections import namedtuple
+from ast_nodes import *
+from parser import Parser
+
+# TAC Instructions namedtuples
+TAC_Assign_Default = namedtuple("TAC_Assign_Default", "Var Type")
+TAC_Assign = namedtuple("TAC_Assign", "Dest Src")
+TAC_Assign_Call = namedtuple("TAC_Assign_Call", "Dest Method Arg")
+TAC_Assign_New = namedtuple("TAC_Assign_New", "Dest Type")
+TAC_Assign_IsVoid = namedtuple("TAC_Assign_IsVoid", "Dest Src")
+TAC_Assign_Plus = namedtuple("TAC_Assign_Plus", "Dest Left Right")
+TAC_Assign_Minus = namedtuple("TAC_Assign_Minus", "Dest Left Right")
+TAC_Assign_Times = namedtuple("TAC_Assign_Times", "Dest Left Right")
+TAC_Assign_Divide = namedtuple("TAC_Assign_Divide", "Dest Left Right")
+TAC_Assign_LessThan = namedtuple("TAC_Assign_LessThan", "Dest Left Right")
+TAC_Assign_LessThanEqual = namedtuple("TAC_Assign_LessThanEqual", "Dest Left Right")
+TAC_Assign_Equal = namedtuple("TAC_Assign_Equal", "Dest Left Right")
+TAC_Assign_Int = namedtuple("TAC_Assign_Int", "Dest Value")
+TAC_Assign_Bool = namedtuple("TAC_Assign_Bool", "Dest Value")
+TAC_Assign_String = namedtuple("TAC_Assign_String", "Dest Value")
+TAC_Assign_Not = namedtuple("TAC_Assign_Not", "Dest Src")
+TAC_Assign_Negate = namedtuple("TAC_Assign_Negate", "Dest Src")
+TAC_Bt = namedtuple("TAC_Bt", "Cond Label")
+TAC_Jmp = namedtuple("TAC_Jmp", "Label")
+TAC_Label = namedtuple("TAC_Label", "Label")
+
+
+TAC_Variable = namedtuple("TAC_Variable", "Name")
+TAC_Return = namedtuple("TAC_Return", "Var")
+
+Default = namedtuple("Default", "Type")
+
+class TAC_Gen:
+    def __init__(self,file):
+
+        self.var_counter=0
+        self.label_counter=0
+
+        self.symbol_table={}
+
+        self.class_map = {}
+        self.imp_map = {}
+        self.parent_map = {}
+        self.parse(file)
+
+    def get_tac(self):
+        starting_point = self.imp_map[("Main","main")][0][1] # wait why is this a list?
+        return self.convert(starting_point)
+
+
+    def parse(self,file):
+        parser=Parser(file)
+        self.class_map, self.imp_map, self.parent_map = parser.parse()
+
+
+    def fresh_var(self):
+        self.var_counter+=1
+        return f"t${self.var_counter}"
+
+    def fresh_label(self):
+        self.label_counter+=1
+        return f"confusingly_named_label_{self.label_counter}"
+
+    """
+    Convert AST to TAC instructions
+    we return the last tac variable, because thats where the result of the expression is stored.
+    
+    Basically the common theme is that we return the list of instructions , afterwards a return address for those instructions.
+        We do this recursively (ofc), like all asts
+    """
+    def convert(self,ast):
+        if isinstance(ast, Identifier):
+            # check if we have in symbol table
+            if ast.Name in self.symbol_table:
+                return [], TAC_Variable(self.symbol_table[ast.Name])
+            else:
+                return [], TAC_Variable(ast.Name)
+        
+        elif isinstance(ast, Default):
+            new_var = self.fresh_var()
+            return [TAC_Assign_Default(TAC_Variable(new_var), ast.Type)], TAC_Variable(new_var)
+
+        # set var to expression
+        elif isinstance(ast, Assign):
+            instr, ret = self.convert(ast.Exp)
+            
+            try:
+                found_var = self.symbol_table[ast.Var.name]
+            except:
+                print("excuse me, but you are trying to assign to a variable that does not exist!")
+                sys.exit(1)
+            
+            to_output = TAC_Assign(TAC_Variable(found_var), ret)
+            return instr + [to_output], TAC_Variable(found_var)
+        
+        elif isinstance(ast, Self_Dispatch):
+            method_name = ast.Method[1]
+            arg_exps = ast.Args
+            
+            instr = []
+            return_exp = []
+            
+            for exp in arg_exps:
+                inst, expr = self.convert(exp)
+                instr.extend(inst)
+                return_exp.append(expr)
+            
+            new_var = self.fresh_var()
+            last_return_exp = return_exp[-1] if return_exp else None
+            
+            to_output = TAC_Assign_Call(
+                new_var, 
+                method_name,
+                last_return_exp if last_return_exp else TAC_Variable("")
+            )
+            
+            return instr + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, If):
+            cond_instr, cond_var = self.convert(ast.Predicate)
+            then_instr, then_var = self.convert(ast.Then)
+            else_instr, else_var = self.convert(ast.Else)
+            
+            then_label = self.fresh_label()
+            else_label = self.fresh_label()
+            join_label = self.fresh_label()
+            
+            bt_instr = TAC_Bt(cond_var, then_label)
+            jmp_else = TAC_Jmp(else_label)
+            jmp_join = TAC_Jmp(join_label)
+            
+            result = (
+                cond_instr + 
+                [bt_instr, jmp_else, TAC_Label(then_label)] + 
+                then_instr + 
+                [jmp_join, TAC_Label(else_label)] + 
+                else_instr + 
+                [TAC_Label(join_label)]
+            )
+
+           # why is it then_var?
+            return result, then_var
+        
+        elif isinstance(ast, While):
+            cond_instr, cond_var = self.convert(ast.Predicate)
+            body_instr, body_var = self.convert(ast.Body)
+            
+            while_label = self.fresh_label()
+            body_label = self.fresh_label()
+            join_label = self.fresh_label()
+            
+            bt_instr = TAC_Bt(cond_var, body_label)
+            jmp_while = TAC_Jmp(while_label)
+            jmp_join = TAC_Jmp(join_label)
+            
+            result = (
+                [TAC_Label(while_label)] + 
+                cond_instr + 
+                [bt_instr, jmp_join, TAC_Label(body_label)] + 
+                body_instr + 
+                [jmp_while, TAC_Label(join_label)]
+            )
+            
+            return result, body_var
+        
+        elif isinstance(ast, Block):
+            if not ast.Body:
+                raise Exception("Empty block")
+            
+            # For each expression in the block
+            if len(ast.Body) == 1:
+                # just return that, no need consider last.
+                return self.convert(ast.Body[0])
+            
+            instructions = []
+            for exp in ast.Body[:-1]:
+                instr, _ = self.convert(exp)
+                instructions.extend(instr)
+            
+            last_instr, last_var = self.convert(ast.Body[-1])
+
+            instructions.extend(last_instr)
+            
+            return instructions, last_var
+        
+        elif isinstance(ast, New):
+            new_var = self.fresh_var()
+            return [TAC_Assign_New(new_var, ast.Type)], TAC_Variable(new_var)
+        
+        elif isinstance(ast, IsVoid):
+            new_var = self.fresh_var()
+            inst, var= self.convert(ast.Exp)
+            to_output = TAC_Assign_IsVoid(new_var, var)
+            return inst+ [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Plus):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_Plus(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Minus):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_Minus(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Times):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_Times(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Divide):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_Divide(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Lt):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_LessThan(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Le):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_LessThanEqual(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+        
+        elif isinstance(ast, Eq):
+            instr1, var1 = self.convert(ast.Left)
+            instr2, var2 = self.convert(ast.Right)
+            new_var = self.fresh_var()
+            to_output = TAC_Assign_Equal(new_var, var1, var2)
+            return instr1 + instr2 + [to_output], TAC_Variable(new_var)
+
+        elif isinstance(ast, Not):
+            new_var = self.fresh_var()
+            instr1, var1 = self.convert(ast.Exp)
+            to_output = TAC_Assign_Not(new_var, var1)
+            return instr1 + [to_output], TAC_Variable(new_var)
+
+        elif isinstance(ast, Negate):
+            new_var = self.fresh_var()
+            instr1, var1 = self.convert(ast.Exp)
+            to_output = TAC_Assign_Negate(new_var, var1)
+            return instr1 + [to_output], TAC_Variable(new_var)
+
+        elif isinstance(ast, Integer):
+            new_var = self.fresh_var()
+            return [TAC_Assign_Int(new_var, ast.Integer)], TAC_Variable(new_var)
+
+        elif isinstance(ast, String):
+            new_var = self.fresh_var()
+            return [TAC_Assign_String(new_var, ast.Value)], TAC_Variable(new_var)
+
+        elif isinstance(ast, true):
+            new_var = self.fresh_var()
+            return [TAC_Assign_Bool(new_var)], TAC_Variable(new_var)
+
+        elif isinstance(ast, false):
+            new_var = self.fresh_var()
+            return [TAC_Assign_Bool(new_var)], TAC_Variable(new_var)
+
+        elif isinstance(ast, Let):
+            bindings = ast.Bindings # can either be Let_No_init or Let_Init
+            binding_instr = []
+            binding_rets = []
+            
+            # Process each binding
+            for binding in bindings:
+                if isinstance(binding,Let_Init):
+                    instr, ret = self.convert(binding.Exp)
+                elif isinstance(binding,Let_No_Init):
+                    # Let_No_Init will have a Type field.
+                    instr, ret = self.convert(Default(Type=binding.Type))
+                else:
+                    print("what")
+                    sys.exit(1)
+
+                binding_instr.extend(instr)
+                binding_rets.append(ret)
+            
+            # Map variables with their corresponding temporary variables
+            for i, binding in enumerate(bindings):
+                self.symbol_table[binding.Var.name] = binding_rets[i].Name
+            
+            # Convert body
+            # we have the variable for the bindings with their corresponding temporary register name!
+            body_instr, body_ret = self.convert(ast.Body)
+            
+            # Clean up bindings from var_map
+            for binding in bindings:
+                if binding.Var.name in self.symbol_table:
+                    del self.symbol_table[binding.Var.name]
+            
+            return binding_instr + body_instr, body_ret
+        
+        else:
+            print(f"Expression not handled: {type(ast)}")
+            sys.exit(1)
+    
+    # Print TAC to output file
+    # TODO: Fix
+    # def print_tac(instructions, expression):
+    #     for instr in instructions:
+    #         if isinstance(instr, TAC_Assign):
+    #             fout.write(f"{instr.Dest.Name} <- {instr.Src.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Default):
+    #             fout.write(f"{instr.Var.Name} <- default {instr.Type}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Call):
+    #             fout.write(f"{instr.Dest} <- call {instr.Method} {instr.Arg.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_New):
+    #             fout.write(f"{instr.Dest} <- new {instr.Type}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_IsVoid):
+    #             fout.write(f"{instr.Dest} <- isvoid {instr.Src.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Plus):
+    #             fout.write(f"{instr.Dest} <- + {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Minus):
+    #             fout.write(f"{instr.Dest} <- - {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Times):
+    #             fout.write(f"{instr.Dest} <- * {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Divide):
+    #             fout.write(f"{instr.Dest} <- / {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_LessThan):
+    #             fout.write(f"{instr.Dest} <- < {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_LessThanEqual):
+    #             fout.write(f"{instr.Dest} <- <= {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Equal):
+    #             fout.write(f"{instr.Dest} <- = {instr.Left.Name} {instr.Right.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Int):
+    #             fout.write(f"{instr.Dest} <- int {instr.Value}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Bool):
+    #             fout.write(f"{instr.Dest} <- bool {instr.Value}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_String):
+    #             fout.write(f"{instr.Dest} <- string\n{instr.Value}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Not):
+    #             fout.write(f"{instr.Dest} <- not {instr.Src.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Assign_Negate):
+    #             fout.write(f"{instr.Dest} <- ~ {instr.Src.Name}\n")
+    #
+    #         elif isinstance(instr, TAC_Bt):
+    #             fout.write(f"bt {instr.Cond.Name} {instr.Label}\n")
+    #
+    #         elif isinstance(instr, TAC_Jmp):
+    #             fout.write(f"jmp {instr.Label}\n")
+    #
+    #         elif isinstance(instr, TAC_Label):
+    #             fout.write(f"label {instr.Label}\n")
+    #
+    #     # Print return expression
+    #     fout.write(f"return {expression.Name}\n")
+    
+
+tac_gen = TAC_Gen("test.cl-type")
+
+print(tac_gen.get_tac())

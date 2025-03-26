@@ -24,6 +24,12 @@ class Parser:
         # self.act_recs = 0 # keep track of activation records
         self.read_lines()
 
+    def parse(self):
+        self.read_class_map()
+        self.read_imp_map()
+        self.read_parent_map()
+        return self.class_map, self.imp_map, self.parent_map
+    
     def read_lines(self):
         sys.setrecursionlimit(20000)
         # fname = sys.argv[1] 
@@ -232,11 +238,11 @@ class Parser:
             case default: val = None
         return val
     
-    def map_attrs(self, attributes):
-        new_e = Environment()
-        for attr_name in attributes:
-            new_e.update(attr_name, attributes[attr_name])
-        return new_e
+    # def map_attrs(self, attributes):
+    #     new_e = Environment()
+    #     for attr_name in attributes:
+    #         new_e.update(attr_name, attributes[attr_name])
+    #     return new_e
     
     def closest_ancestor(self, x, case_elems):
         while (x != "Object"):
@@ -246,9 +252,3 @@ class Parser:
         for elem in case_elems:
             if elem.Type.str == "Object": return elem
         return None
-
-    def parse(self):
-        self.read_class_map()
-        self.read_imp_map()
-        self.read_parent_map()
-        return self.class_map, self.imp_map, self.parent_map
