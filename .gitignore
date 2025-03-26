@@ -13,3 +13,6 @@ testcases
 
 # for reference
 ignore
+
+__pycache__
+.idea
