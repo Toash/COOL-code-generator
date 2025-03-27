@@ -2,7 +2,6 @@
 """
 Generate TAC
 """
-
 import sys
 from collections import namedtuple
 from ast_nodes import *
@@ -34,7 +33,7 @@ TAC_Variable = namedtuple("TAC_Variable", "Name")
 TAC_Label = namedtuple("TAC_Label", "Label")
 TAC_Comment = namedtuple("TAC_Comment", "Comment")
 
-class TAC_Gen:
+class TacGen:
 
     def __init__(self,file):
         self.file = file
@@ -50,11 +49,15 @@ class TAC_Gen:
         self.tac_instructions = []
         self.final_return_variable= ""
 
-        self.parse(file)
-        self.gen_tac() # update object state for instrs and retval
+        self._parse(file)
+        self._gen_tac() # update object state for instrs and retval
 
+    def get_instructions(self):
+        return self.tac_instructions
+    def get_final_return_variable(self):
+        return self.final_return_variable
 
-    def gen_tac(self):
+    def _gen_tac(self):
         self.tac_instructions.append(TAC_Comment(Comment="start"))
         starting_point = self.imp_map[("Main","main")][0] # wait why is this a list?
         self.tac_instructions.append(TAC_Label(Label="Main_main"))
@@ -138,7 +141,7 @@ class TAC_Gen:
             # Print return expression
             file.write(f"return {return_var.Name}\n")
 
-    def parse(self,file):
+    def _parse(self, file):
         parser=Parser(file)
         self.class_map, self.imp_map, self.parent_map = parser.parse()
 
@@ -410,7 +413,7 @@ class TAC_Gen:
 
 
 
-
-tac_gen = TAC_Gen(sys.argv[1])
-tac_gen.output_tac()
-# print(tac_gen.get_tac())
+if __name__ == '__main__':
+    tac_gen = TacGen(sys.argv[1])
+    tac_gen.output_tac()
+    # print(tac_gen.get_tac())

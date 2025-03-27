@@ -1,6 +1,6 @@
 cool --type ./tests/"$1"
 
-python3 TAC_Gen.py ./tests/"$1"-type
+python3 tac/TAC_Gen.py ./tests/"$1"-type
 
 echo "generating my tac output..."
 
