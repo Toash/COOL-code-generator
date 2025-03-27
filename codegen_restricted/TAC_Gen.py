@@ -8,7 +8,7 @@ from collections import namedtuple
 from ast_nodes import *
 from parser import Parser
 
-# TAC Instructions namedtuples
+# TAC Instructions
 TAC_Assign_Default = namedtuple("TAC_Assign_Default", "Var Type")
 TAC_Assign = namedtuple("TAC_Assign", "Dest Src")
 TAC_Assign_Call = namedtuple("TAC_Assign_Call", "Dest Method Arg")
@@ -28,32 +28,115 @@ TAC_Assign_Not = namedtuple("TAC_Assign_Not", "Dest Src")
 TAC_Assign_Negate = namedtuple("TAC_Assign_Negate", "Dest Src")
 TAC_Bt = namedtuple("TAC_Bt", "Cond Label")
 TAC_Jmp = namedtuple("TAC_Jmp", "Label")
-TAC_Label = namedtuple("TAC_Label", "Label")
 
-
+# represents a temporary to be used in TAC
 TAC_Variable = namedtuple("TAC_Variable", "Name")
-TAC_Return = namedtuple("TAC_Return", "Var")
-
-Default = namedtuple("Default", "Type")
+TAC_Label = namedtuple("TAC_Label", "Label")
+TAC_Comment = namedtuple("TAC_Comment", "Comment")
 
 class TAC_Gen:
+
     def __init__(self,file):
+        self.file = file
 
         self.var_counter=0
         self.label_counter=0
-
         self.symbol_table={}
 
         self.class_map = {}
         self.imp_map = {}
         self.parent_map = {}
+
+        self.tac_instructions = []
+        self.final_return_variable= ""
+
         self.parse(file)
+        self.gen_tac() # update object state for instrs and retval
 
-    def get_tac(self):
+
+    def gen_tac(self):
+        self.tac_instructions.append(TAC_Comment(Comment="start"))
         starting_point = self.imp_map[("Main","main")][0] # wait why is this a list?
-        print(starting_point)
-        return self.convert(starting_point)
+        self.tac_instructions.append(TAC_Label(Label="Main_main"))
 
+        # print(starting_point)
+        new_instructions, self.final_return_variable = self.convert(starting_point)
+        self.tac_instructions.extend(new_instructions)
+
+    # Print TAC to output file
+    def output_tac(self):
+        instructions = self.tac_instructions
+        return_var = self.final_return_variable
+
+        file_tac = self.file.replace(".cl-type",".cl-tac")
+        with open(file_tac, "w") as file:
+            # print("outputting tac...")
+            for instr in instructions:
+                if isinstance(instr, TAC_Assign):
+                    file.write(f"{instr.Dest.Name} <- {instr.Src.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Default):
+                    file.write(f"{instr.Var.str} <- default {instr.Type}\n")
+
+                elif isinstance(instr, TAC_Assign_Call):
+                    file.write(f"{instr.Dest} <- call {instr.Method} {instr.Arg.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_New):
+                    file.write(f"{instr.Dest} <- new {instr.Type}\n")
+
+                elif isinstance(instr, TAC_Assign_IsVoid):
+                    file.write(f"{instr.Dest} <- isvoid {instr.Src.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Plus):
+                    file.write(f"{instr.Dest} <- + {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Minus):
+                    file.write(f"{instr.Dest} <- - {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Times):
+                    file.write(f"{instr.Dest} <- * {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Divide):
+                    file.write(f"{instr.Dest} <- / {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_LessThan):
+                    file.write(f"{instr.Dest} <- < {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_LessThanEqual):
+                    file.write(f"{instr.Dest} <- <= {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Equal):
+                    file.write(f"{instr.Dest} <- = {instr.Left.Name} {instr.Right.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Int):
+                    file.write(f"{instr.Dest} <- int {instr.Value}\n")
+
+                elif isinstance(instr, TAC_Assign_Bool):
+                    file.write(f"{instr.Dest} <- bool {instr.Value}\n")
+
+                elif isinstance(instr, TAC_Assign_String):
+                    file.write(f"{instr.Dest} <- string\n{instr.Value}\n")
+
+                elif isinstance(instr, TAC_Assign_Not):
+                    file.write(f"{instr.Dest} <- not {instr.Src.Name}\n")
+
+                elif isinstance(instr, TAC_Assign_Negate):
+                    file.write(f"{instr.Dest} <- ~ {instr.Src.Name}\n")
+
+                elif isinstance(instr, TAC_Bt):
+                    file.write(f"bt {instr.Cond.Name} {instr.Label}\n")
+
+                elif isinstance(instr, TAC_Jmp):
+                    file.write(f"jmp {instr.Label}\n")
+
+                elif isinstance(instr, TAC_Label):
+                    file.write(f"label {instr.Label}\n")
+
+                elif isinstance(instr, TAC_Comment):
+                    file.write(f"comment {instr.Comment}\n")
+
+            # Print return expression
+            file.write(f"return {return_var.Name}\n")
 
     def parse(self,file):
         parser=Parser(file)
@@ -66,7 +149,8 @@ class TAC_Gen:
 
     def fresh_label(self):
         self.label_counter+=1
-        return f"confusingly_named_label_{self.label_counter}"
+        #should probably generate a better label name
+        return f"label_{self.label_counter}"
 
     """
     Convert AST to TAC instructions
@@ -78,24 +162,21 @@ class TAC_Gen:
     def convert(self, ast):
         line_number = ast[0]
         exp = ast[1]
-        print("Converting:", exp)
+        # print("Converting:", exp)
+
         if isinstance(exp, Identifier):
             # check if we have in symbol table
-            if exp.Name in self.symbol_table:
-                return [], TAC_Variable(self.symbol_table[exp.Name])
+            if exp.Var.str in self.symbol_table:
+                return [], TAC_Variable(self.symbol_table[exp.Var.str])
             else:
-                return [], TAC_Variable(exp.Name)
+                return [], TAC_Variable(exp.Var.str)
         
-        elif isinstance(exp, Default):
-            new_var = self.fresh_var()
-            return [TAC_Assign_Default(TAC_Variable(new_var), exp.Type)], TAC_Variable(new_var)
-
         # set var to expression
         elif isinstance(exp, Assign):
             instr, ret = self.convert(exp.Exp)
             
             try:
-                found_var = self.symbol_table[exp.Var.name]
+                found_var = self.symbol_table[exp.Var.str]
             except:
                 print("excuse me, but you are trying to assign to a variable that does not exist!")
                 sys.exit(1)
@@ -183,12 +264,11 @@ class TAC_Gen:
                 return self.convert(exp.Body[0])
             
             instructions = []
-            for exp in exp.Body[:-1]:
-                instr, _ = self.convert(exp)
+            for exp1 in exp.Body[:-1]:
+                instr, _ = self.convert(exp1)
                 instructions.extend(instr)
-            
-            last_instr, last_var = self.convert(exp.Body[-1])
 
+            last_instr, last_var = self.convert(exp.Body[-1])
             instructions.extend(last_instr)
             
             return instructions, last_var
@@ -272,15 +352,15 @@ class TAC_Gen:
 
         elif isinstance(exp, String):
             new_var = self.fresh_var()
-            return [TAC_Assign_String(new_var, exp.Value)], TAC_Variable(new_var)
+            return [TAC_Assign_String(new_var, exp.String)], TAC_Variable(new_var)
 
         elif isinstance(exp, true):
             new_var = self.fresh_var()
-            return [TAC_Assign_Bool(new_var)], TAC_Variable(new_var)
+            return [TAC_Assign_Bool(Dest=new_var,Value="true")], TAC_Variable(new_var)
 
         elif isinstance(exp, false):
             new_var = self.fresh_var()
-            return [TAC_Assign_Bool(new_var)], TAC_Variable(new_var)
+            return [TAC_Assign_Bool(Dest=new_var,Value="false")], TAC_Variable(new_var)
 
         elif isinstance(exp, Let):
             bindings = exp.Bindings # can either be Let_No_init or Let_Init
@@ -292,10 +372,17 @@ class TAC_Gen:
                 if isinstance(binding,Let_Init):
                     instr, ret = self.convert(binding.Exp)
                 elif isinstance(binding,Let_No_Init):
-                    # Let_No_Init will have a Type field.
-                    instr, ret = self.convert(Default(Type=binding.Type))
+                    binding_type = binding.Type.str
+                    print("Binding type: ", binding_type)
+
+                    # we need a var to assign the default value to.
+                    var = self.fresh_var()
+                    # to keep it consistent
+                    var_id = ID(loc=0,str=var)
+                    instr = [TAC_Assign_Default(Var=var_id, Type=binding_type)]
+                    ret = TAC_Variable(Name=var)
                 else:
-                    print("what")
+                    print("Invalid binding, what?")
                     sys.exit(1)
 
                 binding_instr.extend(instr)
@@ -303,92 +390,27 @@ class TAC_Gen:
             
             # Map variables with their corresponding temporary variables
             for i, binding in enumerate(bindings):
-                self.symbol_table[binding.Var.name] = binding_rets[i].Name
+                # print("binding:", binding)
+                self.symbol_table[binding.Var.str] = binding_rets[i].Name
             
             # Convert body
             # we have the variable for the bindings with their corresponding temporary register name!
             body_instr, body_ret = self.convert(exp.Body)
-            
+
             # Clean up bindings from var_map
             for binding in bindings:
-                if binding.Var.name in self.symbol_table:
-                    del self.symbol_table[binding.Var.name]
-            
+                if binding.Var.str in self.symbol_table:
+                    del self.symbol_table[binding.Var.str]
+
             return binding_instr + body_instr, body_ret
-        
+
         else:
             print(f"Expression not handled: {type(exp)}")
             sys.exit(1)
-    
-    # Print TAC to output file
-    # TODO: Fix
-    # def print_tac(instructions, expression):
-    #     for instr in instructions:
-    #         if isinstance(instr, TAC_Assign):
-    #             fout.write(f"{instr.Dest.Name} <- {instr.Src.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Default):
-    #             fout.write(f"{instr.Var.Name} <- default {instr.Type}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Call):
-    #             fout.write(f"{instr.Dest} <- call {instr.Method} {instr.Arg.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_New):
-    #             fout.write(f"{instr.Dest} <- new {instr.Type}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_IsVoid):
-    #             fout.write(f"{instr.Dest} <- isvoid {instr.Src.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Plus):
-    #             fout.write(f"{instr.Dest} <- + {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Minus):
-    #             fout.write(f"{instr.Dest} <- - {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Times):
-    #             fout.write(f"{instr.Dest} <- * {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Divide):
-    #             fout.write(f"{instr.Dest} <- / {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_LessThan):
-    #             fout.write(f"{instr.Dest} <- < {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_LessThanEqual):
-    #             fout.write(f"{instr.Dest} <- <= {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Equal):
-    #             fout.write(f"{instr.Dest} <- = {instr.Left.Name} {instr.Right.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Int):
-    #             fout.write(f"{instr.Dest} <- int {instr.Value}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Bool):
-    #             fout.write(f"{instr.Dest} <- bool {instr.Value}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_String):
-    #             fout.write(f"{instr.Dest} <- string\n{instr.Value}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Not):
-    #             fout.write(f"{instr.Dest} <- not {instr.Src.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Assign_Negate):
-    #             fout.write(f"{instr.Dest} <- ~ {instr.Src.Name}\n")
-    #
-    #         elif isinstance(instr, TAC_Bt):
-    #             fout.write(f"bt {instr.Cond.Name} {instr.Label}\n")
-    #
-    #         elif isinstance(instr, TAC_Jmp):
-    #             fout.write(f"jmp {instr.Label}\n")
-    #
-    #         elif isinstance(instr, TAC_Label):
-    #             fout.write(f"label {instr.Label}\n")
-    #
-    #     # Print return expression
-    #     fout.write(f"return {expression.Name}\n")
-    
+
+
 
 
 tac_gen = TAC_Gen(sys.argv[1])
-
-print(tac_gen.get_tac())
+tac_gen.output_tac()
+# print(tac_gen.get_tac())

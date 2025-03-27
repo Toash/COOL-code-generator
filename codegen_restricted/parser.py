@@ -9,6 +9,49 @@ import sys
 # # parent child relationship
 # parent_map = {} 
 
+class Cool_Object:
+    def __init__(self, class_name):
+        self.type = class_name
+        self.attributes = {}
+
+    def add_attr(self, attr_name, loc):
+        self.attributes[attr_name] = loc
+
+    def __str__(self):
+        return (f"{self.type}({str(self.attributes)})")
+
+
+class Cool_Int:
+    def __init__(self, class_name, integer):
+        self.type = class_name
+        self.integer = integer
+        self.attributes = {}
+
+    def __str__(self):
+        return (f"{self.type}({str(self.integer)})")
+
+
+class Cool_String:
+    def __init__(self, class_name, len, str):
+        self.type = class_name
+        self.length = len
+        self.string = str
+        self.attributes = {}
+
+    def __str__(self):
+        return (f"{self.type}({str(self.length)}, {self.string})")
+
+
+class Cool_Bool:
+    def __init__(self, class_name, bool):
+        self.type = class_name
+        self.bool = bool
+        self.attributes = {}
+
+    def __str__(self):
+        return (f"{self.type}({str(self.bool)})")
+
+
 # # parse / deserialize the .cl-type file from the semantic analyzer, populate these
 # read_class_map()
 # read_imp_map()

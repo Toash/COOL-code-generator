@@ -129,7 +129,7 @@ def main():
 
     # start generating stack instructions 
     print("hello!")
-    with open("output.s","w") as file:
+    with open("output.cl-tac", "w") as file:
         for inst in instructions:
             if(isinstance(inst,str)):
                 file.write(inst)
