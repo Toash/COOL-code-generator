@@ -102,6 +102,15 @@ class Main inherits IO{
                 fi;
             };
             out_string("\n\n");
+
+            -- assignment
+            out_string("assignment:\n");
+            let x:Int <- 1 in
+            {
+                x<-1337;
+                out_int(x);
+            };
+            out_string("\n\n");
         }
     };
 };

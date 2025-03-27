@@ -12,7 +12,10 @@ examples
 testcases
 
 # for reference
+COOL_REFERENCE
+MY_OUTPUT
 ignore
+
 
 __pycache__
 .idea
