@@ -57,12 +57,16 @@ class TacGen:
     def get_final_return_variable(self):
         return self.final_return_variable
 
+    def get_class_imp_parent_map(self):
+        return self.class_map, self.imp_map, self.parent_map
+
     def _gen_tac(self):
+        # need to extend this to work for all methods.
+
         self.tac_instructions.append(TAC_Comment(Comment="start"))
-        starting_point = self.imp_map[("Main","main")][0] # wait why is this a list?
         self.tac_instructions.append(TAC_Label(Label="Main_main"))
 
-        # print(starting_point)
+        starting_point = self.imp_map[("Main","main")][0] # wait why is this a list?
         new_instructions, self.final_return_variable = self.convert(starting_point)
         self.tac_instructions.extend(new_instructions)
 

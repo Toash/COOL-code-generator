@@ -1,5 +1,6 @@
-class Main{
+class Main inherits IO{
+    test:Int <- 1;
     main():Object{
-       1
+        out_int(1)
     };
 };
