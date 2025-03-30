@@ -4,10 +4,11 @@ from ast_nodes import *
 import sys
 
 self_reg = "r0"
-acc_reg = "r1" # result of expressions are always in accumulator
+acc_reg = "r1"  # result of expressions are always in accumulator
 temp_reg = "r2"
 temp1_reg = temp_reg
 temp2_reg = "r3"
+
 # https://kelloggm.github.io/martinjkellogg.com/teaching/cs485-sp25/crm/modern/Cool%20Assembly%20Language.html
 ASM_Comment = namedtuple("ASM_Comment", "comment")
 ASM_Label = namedtuple("ASM_Label", "label")
@@ -33,8 +34,11 @@ ASM_Return = namedtuple("ASM_Return", "") # go to address in ra register (we han
 
 ASM_Push = namedtuple("ASM_Push", "reg")
 ASM_Pop = namedtuple("ASM_Pop", "reg")
-ASM_Ld = namedtuple("ASM_Ld", "dest src offset")
-ASM_St = namedtuple("ASM_St", "dest src offset")
+
+# Memory instructions
+ASM_Ld = namedtuple("ASM_Ld", "dest src offset") # dest <- src[offset]
+ASM_St = namedtuple("ASM_St", "dest src offset") # dest[offset] <- src
+
 ASM_La = namedtuple("ASM_La", "reg label") # load address in register
 
 # alloc r1 r2 allocates memory by amount in r2 and stores pointer in r1.
@@ -76,6 +80,11 @@ class CoolAsmGen:
             # or offset ( fp[4] )
             self.symbol_table = {}
 
+            # store index with <type, mname>
+            # to lookup when emitting code for dispatch
+            self.vtable_method_indexes = {}
+
+
             self.env = {}
             self.next_stack_offset = 1
 
@@ -91,13 +100,17 @@ class CoolAsmGen:
             # attributes
             self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
 
+            #intiialize x for outint and stuff?
+            # FIXME: This is probably wrong.
+            self.symbol_table["x"] = Register("r4")
+
             from pprint import pprint
             print("CLASS MAP:")
             pprint( self.class_map)
-            print("IMPLEMENTATION MAP:")
-            pprint( self.imp_map)
-            print("PARENT MAP:")
-            pprint( self.parent_map)
+            # print("IMPLEMENTATION MAP:")
+            # pprint( self.imp_map)
+            # print("PARENT MAP:")
+            # pprint( self.parent_map)
             print("DIRECT METHODS:")
             pprint(self.direct_methods)
 
@@ -105,6 +118,8 @@ class CoolAsmGen:
             self.emit_constructors()
             self.emit_methods()
 
+
+            # pprint(self.vtable_method_indexes)
 
             # Starting point?
             # self.comment("START")
@@ -149,19 +164,34 @@ class CoolAsmGen:
             case ASM_Add(dst, left, right):
                 return f"add {dst} <- {left} {right}"
 
+            case ASM_Call_Label(label):
+                return f"call {label}"
             case ASM_Call_Reg(reg):
                 return f"call {reg}"
+
             case ASM_Return():
                 return "return"
 
+            case ASM_Push(reg):
+                return f"push {reg}"
+            case ASM_Pop(reg):
+                return f"pop {reg}"
+
+
+            case ASM_Ld(dest,src,offset):
+                return f"ld {dest} <- {src}[{offset}]"
             case ASM_St(dest,src,offset):
                 return f"st {dest}[{offset}] <- {src}"
+
             case ASM_La(reg, label):
                 return f"la {reg} <- {label}"
             case ASM_Alloc(dest,src):
                 return f"alloc {dest} {src}"
             case ASM_Constant_label(label):
                 return f"constant {label}"
+
+            case ASM_Syscall(name):
+                return f"syscall {name}"
 
             case _:
                 print("Unhandled ASM instruction: ", instr)
@@ -174,25 +204,33 @@ class CoolAsmGen:
         self.comment("they will represent 8 byte delineations in memory.")
         self.comment("key insight for dynamic dispatch to work correctly: method ordering should be the same")
         for cls in self.class_map:
+            index = 0
             # self.outfile.write( # label
             self.add_asm(ASM_Label(label = f"{cls}..vtable"))
 
-            self.add_asm(ASM_Constant_label(label=f"{cls}..new"))
+            constant_constructor = f"{cls}..new"
+            self.add_asm(ASM_Constant_label(label= constant_constructor))
+            self.vtable_method_indexes[(cls, constant_constructor)] = index
+            index += 1
             # self.write(f"constant {cls}..new") # constructor
 
             #inhertied methods
-            for (imp_cls,imp_method), imp in self.imp_map.items():
+            for (class_name,method_name), imp in self.imp_map.items():
+
                 exp = imp[-1][1] # skip over formals and line number
                 # TODO: This is probably not handling inheritance for non internals.
                 if type(exp).__name__ == "Internal":
-                    if cls == imp_cls:
+                    if cls == class_name:
                         # body contaisn a string for the actual class and method called.
-                        # self.write(f"constant {exp.Body}")
                         self.add_asm(ASM_Constant_label(label=f"{exp.Body}"))
+                        self.vtable_method_indexes[(class_name, exp.Body)] = index
+                        index += 1
                 else:
-                    if cls == imp_cls:
-                        # self.write(f"constant {imp_cls}.{imp_method}")
-                        self.add_asm(ASM_Constant_label(label=f"{imp_cls}.{imp_method}"))
+                    if cls == class_name:
+                        self.add_asm(ASM_Constant_label(label=f"{class_name}.{method_name}"))
+                        self.vtable_method_indexes[(class_name, method_name)] = index
+                        index+=1
+
 
     def emit_constructors(self):
         self.comment("CONSTRUCTORS")
@@ -237,23 +275,28 @@ class CoolAsmGen:
             for i,attr in enumerate(attrs, start=1):
                 # FIXME: calling convention stuff
                 self.comment("\t\t\t\tFIXME: calling convention stuff")
+
+                # we are in Int Class.
                 if attr.Type == "Unboxed_Int":
                     self.comment(f"\t\t\t\tStore int {0} in object layout for Int.")
                     self.add_asm(ASM_Li(acc_reg,0))
                 else:
-                    self.comment("\t\t\t\tFIXME: calling convention stuff")
+                    # call constrsuctor for attribute type.
                     self.add_asm(ASM_La(temp_reg, f"{attr.Type}..new"))
                     self.add_asm(ASM_Call_Reg(temp_reg))
 
                 self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = i))
 
             #initializers
+            if attrs:
+                self.comment("\t\t\t\tInitializers")
             for i,attr in enumerate(attrs, start=1):
                 if attr.Type == "Unboxed_Int":
                     continue
                 exp = attr.Initializer[1]
-                self.comment(f"\t\t\t\tdo cgen (TAC?) here for {exp}" )
-                self.comment(f"\t\t\t\tResult should be in r1 (acc) register." )
+                # self.comment(f"\t\t\t\tdo cgen (TAC?) here for {exp}" )
+                self.cgen(exp)
+                # store the result of cgen in an attribute slot.
                 self.add_asm(ASM_St(self_reg,acc_reg,i))
                 # print(attr.Initializer)
 
@@ -288,29 +331,33 @@ class CoolAsmGen:
     # generate code for e, put on accumulator register.
     # leave stack the way we found it (good behaviour)
     # how exactly do we take advantage of TAC?
-    def cgen(self, instr):
+    def cgen(self, exp):
         # we need to change this when adding tags and size in the object layout.
+        vtable_index = 0
         attr_start_index = 1
+
         # print(type(instr).__name__)
-        self.comment(f"\t\t\t\tDO CGEN HERE FOR EXPRESSION {instr}")
-        match type(instr):
-            
+        self.comment(f"\t\t\t\tdoing cgen for {exp}")
+        match exp:
             # when we encounter an ordinary variable in TAC.
             case Identifier(Var):
-                match self.symbol_table[Var.str]:
+
+                match self.symbol_table[Var]:
                     case Register(reg):
-                        print(f"Found variable in register {reg}")
+                        # print(f"Found variable in register {reg}")
                         self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
-                        pass
                     case Offset(reg,offset):
-                        print(f"Found variable in register {reg} at offset {offset}")
+                        # print(f"Found variable in register {reg} at offset {offset}")
                         self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
-                        pass
-            case Integer(Var):
+
+            case Integer(Integer=val, StaticType=st):
+                print("codegen: ", exp)
                 # ?
-                # make new int , fill with 0 , fill with actual value.
+                # make new int , fill with actual value.
                 self.cgen(New(Type="Int",StaticType="Int"))
-                self.add_asm(ASM_St(acc_reg,attr_start_index,Var.str))
+                # access secrete fields :)
+                self.comment("\t\t\t\t we just generated a new int, now we putting the actual value in attribute. :)")
+                self.add_asm(ASM_St(acc_reg,val,attr_start_index))
 
             case Plus(Left,Right):
                 """
@@ -339,17 +386,27 @@ class CoolAsmGen:
                 # result in acc, get the left expression from stack.
                 self.add_asm(ASM_Pop(temp_reg))
 
-                # load unboxed integers.
-                self.add_asm(ASM_Ld(acc_reg,acc_reg,attr_start_index))
+                # load unboxed integers (raw values).
+                # loads value in src[offset] into dest.
+                self.add_asm(ASM_Ld(
+                    dest = acc_reg,
+                    src = acc_reg,
+                    offset = attr_start_index))
                 self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
 
                 self.add_asm(ASM_Add(temp_reg,acc_reg,temp_reg))
+
+                #save result
                 self.add_asm(ASM_Push(temp_reg))
                 # now in acc.
                 self.cgen(New(Type="Int", StaticType="Int"))
                 self.add_asm(ASM_Pop(temp_reg))
                 # store unboxed int in the new int
-                self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
+                # stores value in src to dest[offset]
+                self.add_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attr_start_index))
             case New(Type):
                 self.comment("\t\t\t\tFIXME: calling convention stuff")
                 # going to put result in ra register.
@@ -357,11 +414,45 @@ class CoolAsmGen:
 
             # Dispatch
             case Dynamic_Dispatch(Exp,Method,Args):
+                for arg in Args:
+                    self.cgen(arg)
+
+                    self.comment("\t\t\t\tFIXME: calling convention stuff")
+                    self.add_asm(ASM_Push(acc_reg))
+                #receiver object (new?)
+                self.cgen(Exp)
+                self.add_asm(ASM_Push(acc_reg))
+
+                """
+                1. load RO (acc) vtable into (temp)
+                2. load the vtable index into (temp2)
+                3. temp <- temp[temp2] -- get method pointer
+                4. call temp
+                """
+                # receiever object in acc.
+                # e.g: someone wants to invoke "out_int" or "main"
+                # emit code to lookup in vtable.
+                self.add_asm(ASM_Ld(dest=temp_reg,src=acc_reg,offset=vtable_index))
+
+                class_name = Exp.Type
+                method_name = Method.str
+                method_vtable_index = self.vtable_method_indexes[(class_name,method_name)]
+                # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
+                self.add_asm(ASM_Ld(temp_reg,temp_reg,method_vtable_index))
+                self.add_asm(ASM_Call_Reg(temp_reg))
+                self.comment("\t\t\t\tFIXME: calling convention stuff")
+
+            case Internal(Body):
+                self.cgen(Identifier(Var="x",StaticType="idk"))
+                # load unboxed int
+                self.add_asm(ASM_Ld(acc_reg,acc_reg,attr_start_index))
+                self.add_asm(ASM_Syscall("IO.out_int"))
+                # FIXME
 
                 pass
             case _:
-                print("UNHANDLED: ",instr)
-
+                # print("Unknown expression in cgen: ", exp)
+                pass
 
 
     def comment(self,comment):
