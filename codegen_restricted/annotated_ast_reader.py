@@ -1,15 +1,9 @@
 from ast_nodes import *
 import sys
-# # explicitly defined classes and their attributes
-# class_map = {}
-# # Defines classes and their methods
-# # takes into account overriding
-# imp_map = {}
-# # inheritance hierarchy
-# # parent child relationship
-# parent_map = {} 
 
-class Parser:
+
+
+class AnnotatedAstReader:
     def __init__(self,filename):
         self.filename = filename
         self.lines = []
@@ -26,6 +20,7 @@ class Parser:
         self.read_class_map()
         self.read_imp_map()
         self.read_parent_map()
+
         self.get_direct_methods()
         return self.class_map, self.imp_map, self.parent_map, self.direct_methods
     

@@ -26,3 +26,5 @@ TAC_Variable = namedtuple("TAC_Variable", "Name")
 
 TAC_Label = namedtuple("TAC_Label", "Label")
 TAC_Comment = namedtuple("TAC_Comment", "Comment")
+
+TAC_Internal = namedtuple("TAC_Internal","Body")

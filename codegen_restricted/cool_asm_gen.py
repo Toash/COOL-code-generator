@@ -1,13 +1,10 @@
 from collections import namedtuple
-from unittest import case
+from annotated_ast_reader import AnnotatedAstReader
 from ast_nodes import *
-from tac_instructions import *
-import TacGen
 import sys
 
-
 self_reg = "r0"
-acc_reg = "r1"
+acc_reg = "r1" # result of expressions are always in accumulator
 temp_reg = "r2"
 temp1_reg = temp_reg
 temp2_reg = "r3"
@@ -86,10 +83,12 @@ class CoolAsmGen:
             asm_file = "!MY_COOL_ASM.cl-asm"
             self.outfile = open(asm_file,"w")
 
-            tac_gen = TacGen.TacGen(file)
-            self.tac_instructions = tac_gen.get_instructions()
-            self.class_map, self.imp_map, self.parent_map,self.direct_methods = tac_gen.get_context()
+            # tac_gen = TacGen.TacGen(file)
+            parser = AnnotatedAstReader(file)
+            self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
 
+
+            # attributes
             self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
 
             from pprint import pprint
@@ -196,8 +195,6 @@ class CoolAsmGen:
                         self.add_asm(ASM_Constant_label(label=f"{imp_cls}.{imp_method}"))
 
     def emit_constructors(self):
-
-
         self.comment("CONSTRUCTORS")
         for cls,attrs in self.class_map.items():
             self.add_asm(ASM_Label(label=f"{cls}..new"))
@@ -292,12 +289,15 @@ class CoolAsmGen:
     # leave stack the way we found it (good behaviour)
     # how exactly do we take advantage of TAC?
     def cgen(self, instr):
+        # we need to change this when adding tags and size in the object layout.
+        attr_start_index = 1
         # print(type(instr).__name__)
         self.comment(f"\t\t\t\tDO CGEN HERE FOR EXPRESSION {instr}")
         match type(instr):
+            
             # when we encounter an ordinary variable in TAC.
-            case TAC_Variable(Name):
-                match self.symbol_table[Name]:
+            case Identifier(Var):
+                match self.symbol_table[Var.str]:
                     case Register(reg):
                         print(f"Found variable in register {reg}")
                         self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
@@ -306,12 +306,59 @@ class CoolAsmGen:
                         print(f"Found variable in register {reg} at offset {offset}")
                         self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                         pass
-            case TAC_Assign_Int(Dest,Value):
+            case Integer(Var):
                 # ?
                 # make new int , fill with 0 , fill with actual value.
-                self.cgen(TAC_Assign_New(acc_reg,"Int"))
-                contents_field_index = 1 # vtable pointer?
-                self.add_asm(ASM_St(acc_reg,contents_field_index,Value))
+                self.cgen(New(Type="Int",StaticType="Int"))
+                self.add_asm(ASM_St(acc_reg,attr_start_index,Var.str))
+
+            case Plus(Left,Right):
+                """
+                cgen left
+                push acc
+                cgen right; now in acc
+                pop temp
+
+                UNBOXED VALUES
+                acc <- ld acc[1]
+                temp <- ld temp[1]
+                add temp <- temp acc
+
+                push temp
+                new Int
+                pop temp
+                
+                UNBOXED
+                store acc[1] <- temp
+                """
+                # result in accumulator
+                self.cgen(Left)
+                # push result onto stack
+                self.add_asm(ASM_Push(acc_reg))
+                self.cgen(Right)
+                # result in acc, get the left expression from stack.
+                self.add_asm(ASM_Pop(temp_reg))
+
+                # load unboxed integers.
+                self.add_asm(ASM_Ld(acc_reg,acc_reg,attr_start_index))
+                self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+
+                self.add_asm(ASM_Add(temp_reg,acc_reg,temp_reg))
+                self.add_asm(ASM_Push(temp_reg))
+                # now in acc.
+                self.cgen(New(Type="Int", StaticType="Int"))
+                self.add_asm(ASM_Pop(temp_reg))
+                # store unboxed int in the new int
+                self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
+            case New(Type):
+                self.comment("\t\t\t\tFIXME: calling convention stuff")
+                # going to put result in ra register.
+                self.add_asm(ASM_Call_Label(f"{Type}..new"))
+
+            # Dispatch
+            case Dynamic_Dispatch(Exp,Method,Args):
+
+                pass
             case _:
                 print("UNHANDLED: ",instr)
 

@@ -16,6 +16,7 @@ class TacGen:
         self.var_counter=0
         self.label_counter=0
 
+        self.symbol_table = {}
         self.class_map = {}
         self.imp_map = {}
         self.parent_map = {}
@@ -27,6 +28,8 @@ class TacGen:
         self._parse(file)
         self._gen_tac() # update object state for instrs and retval
 
+        from pprint import pprint
+        pprint(self.class_map)
     """
     Convert AST to TAC instructions
     we return the last tac variable, because thats where the result of the expression is stored.
@@ -60,7 +63,7 @@ class TacGen:
             to_output = TAC_Assign(TAC_Variable(found_var), ret)
             return instr + [to_output], TAC_Variable(found_var)
 
-        elif isinstance(exp, Self_Dispatch):
+        elif isinstance(exp, Self_Dispatch) or isinstance(exp,Dynamic_Dispatch):
             method_name = exp.Method[1]
             arg_exps = exp.Args
 
@@ -80,7 +83,8 @@ class TacGen:
                 method_name,
                 last_return_exp if last_return_exp else TAC_Variable("")
             )
-
+            print(instr)
+            print(last_return_exp)
             return instr + [to_output], TAC_Variable(new_var)
 
         elif isinstance(exp, If):
@@ -279,7 +283,8 @@ class TacGen:
                     del self.symbol_table[binding.Var.str]
 
             return binding_instr + body_instr, body_ret
-
+        elif isinstance(exp,Internal):
+            return [TAC_Internal(Body = exp.Body)], TAC_Variable("")
         else:
             print(f"Expression not handled: {type(exp)}")
             sys.exit(1)
@@ -295,22 +300,33 @@ class TacGen:
     def _gen_tac(self):
         # need to extend this to work for all methods.
 
-        self.tac_instructions.append(TAC_Comment(Comment="start"))
-        self.tac_instructions.append(TAC_Label(Label="Main_main"))
 
-        starting_point = self.imp_map[("Main","main")][0] # wait why is this a list?
-        new_instructions, self.final_return_variable = self.convert(starting_point)
-        self.tac_instructions.extend(new_instructions)
+        for (cname,mname), imp in self.direct_methods.items():
+
+            if(cname,mname)==("Main","main"):
+                self.tac_instructions.append(TAC_Comment(Comment="start"))
+            self.tac_instructions.append(TAC_Label(Label=f"{cname}.{mname}"))
+
+            # print(self.imp_map[(cname,mname)])
+            starting_point = self.direct_methods[(cname,mname)][-1]
+
+            print(starting_point)
+            new_instructions, self.final_return_variable = self.convert(starting_point)
+            self.tac_instructions.extend(new_instructions)
 
     # Print TAC to output file
     def flush_tac(self):
         instructions = self.tac_instructions
         return_var = self.final_return_variable
-
+        # print(self.tac_instructions)
+        # print(self.final_return_variable)
         file_tac = self.file.replace(".cl-type",".cl-tac")
         with open(file_tac, "w") as file:
             # print("outputting tac...")
+
             for instr in instructions:
+                if not isinstance(instr,TAC_Label):
+                    file.write("\t\t\t\t")
                 if isinstance(instr, TAC_Assign):
                     file.write(f"{instr.Dest.Name} <- {instr.Src.Name}\n")
 
@@ -373,6 +389,9 @@ class TacGen:
 
                 elif isinstance(instr, TAC_Comment):
                     file.write(f"comment {instr.Comment}\n")
+
+                elif isinstance(instr, TAC_Internal):
+                    file.write(f"internal {instr.Body}\n")
 
             # Print return expression
             file.write(f"return {return_var.Name}\n")

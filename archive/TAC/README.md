@@ -1,4 +1,4 @@
-(old, [rewritten](../codegen_restricted/TacGen.py))
+(old, [rewritten](../TacGen.py))
 
 [Three-Address Code Generator](main.ml)
 
