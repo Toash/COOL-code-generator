@@ -9,53 +9,6 @@ import sys
 # # parent child relationship
 # parent_map = {} 
 
-class Cool_Object:
-    def __init__(self, class_name):
-        self.type = class_name
-        self.attributes = {}
-
-    def add_attr(self, attr_name, loc):
-        self.attributes[attr_name] = loc
-
-    def __str__(self):
-        return (f"{self.type}({str(self.attributes)})")
-
-
-class Cool_Int:
-    def __init__(self, class_name, integer):
-        self.type = class_name
-        self.integer = integer
-        self.attributes = {}
-
-    def __str__(self):
-        return (f"{self.type}({str(self.integer)})")
-
-
-class Cool_String:
-    def __init__(self, class_name, len, str):
-        self.type = class_name
-        self.length = len
-        self.string = str
-        self.attributes = {}
-
-    def __str__(self):
-        return (f"{self.type}({str(self.length)}, {self.string})")
-
-
-class Cool_Bool:
-    def __init__(self, class_name, bool):
-        self.type = class_name
-        self.bool = bool
-        self.attributes = {}
-
-    def __str__(self):
-        return (f"{self.type}({str(self.bool)})")
-
-
-# # parse / deserialize the .cl-type file from the semantic analyzer, populate these
-# read_class_map()
-# read_imp_map()
-# read_parent_map()
 class Parser:
     def __init__(self,filename):
         self.filename = filename
@@ -64,6 +17,8 @@ class Parser:
         self.class_map = {}
         self.imp_map = {}
         self.parent_map = {}
+        self.direct_methods = {}
+
         # self.act_recs = 0 # keep track of activation records
         self.read_lines()
 
@@ -71,7 +26,8 @@ class Parser:
         self.read_class_map()
         self.read_imp_map()
         self.read_parent_map()
-        return self.class_map, self.imp_map, self.parent_map
+        self.get_direct_methods()
+        return self.class_map, self.imp_map, self.parent_map, self.direct_methods
     
     def read_lines(self):
         sys.setrecursionlimit(20000)
@@ -264,6 +220,25 @@ class Parser:
         body = self.read_exp()
         self.imp_map[(class_name, method_name)].append(body)
 
+    def get_direct_methods(self):
+        self.direct_methods = {}
+        for class_name in self.class_map:
+            for (cls, method), imp in self.imp_map.items():
+                if cls != class_name:
+                    continue
+
+                parent = self.parent_map.get(class_name)
+                inherited=False
+                while parent:
+                    if (parent,method) in self.imp_map:
+                        inherited = True
+                        break
+                    parent = self.parent_map.get(parent)
+                if not inherited:
+                    self.direct_methods[(cls,method)] = imp
+
+
+
     def read_parent_map(self):
         self.read()
         num_relations = self.read()
@@ -272,26 +247,3 @@ class Parser:
             parent = self.read()
             self.parent_map[child] = parent
 
-    # Assign default values to Cool values 
-    def get_default_val(self, c):
-        match c:
-            case "Int": val = Cool_Int("Int", 0)
-            case "String": val = Cool_String("String", 0, "")
-            case "Bool": val = Cool_Bool("Bool", False)
-            case default: val = None
-        return val
-    
-    # def map_attrs(self, attributes):
-    #     new_e = Environment()
-    #     for attr_name in attributes:
-    #         new_e.update(attr_name, attributes[attr_name])
-    #     return new_e
-    
-    def closest_ancestor(self, x, case_elems):
-        while (x != "Object"):
-            for elem in case_elems:
-                if x == elem.Type.str: return elem
-            x = self.parent_map[x]
-        for elem in case_elems:
-            if elem.Type.str == "Object": return elem
-        return None
