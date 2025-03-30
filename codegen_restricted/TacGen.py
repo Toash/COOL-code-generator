@@ -71,7 +71,7 @@ class TacGen:
         self.tac_instructions.extend(new_instructions)
 
     # Print TAC to output file
-    def output_tac(self):
+    def flush_tac(self):
         instructions = self.tac_instructions
         return_var = self.final_return_variable
 
@@ -419,5 +419,5 @@ class TacGen:
 
 if __name__ == '__main__':
     tac_gen = TacGen(sys.argv[1])
-    tac_gen.output_tac()
+    tac_gen.flush_tac()
     # print(tac_gen.get_tac())

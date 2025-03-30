@@ -1,11 +1,11 @@
 from collections import namedtuple
 from unittest import case
-
+from ast_nodes import *
 import TacGen
 import sys
 
 # https://kelloggm.github.io/martinjkellogg.com/teaching/cs485-sp25/crm/modern/Cool%20Assembly%20Language.html
-ASM_Comment = namedtuple("ASM_Comment", "comment tabbed")
+ASM_Comment = namedtuple("ASM_Comment", "comment")
 ASM_Label = namedtuple("ASM_Label", "label")
 
 ASM_Li = namedtuple("ASM_Li", "reg imm") # li r1 <- 123
@@ -73,9 +73,12 @@ class CoolAsmGen:
             self.tac_instructions = tac_gen.get_instructions()
             self.class_map, self.imp_map, self.parent_map = tac_gen.get_class_imp_parent_map()
 
-            # from pprint import pprint
-            # print("CLASS MAP:")
-            # pprint( self.class_map)
+            self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
+
+
+            from pprint import pprint
+            print("CLASS MAP:")
+            pprint( self.class_map)
             # print("IMPLEMENTATION MAP:")
             # pprint( self.imp_map)
             # print("PARENT MAP:")
@@ -109,13 +112,10 @@ class CoolAsmGen:
     def format_asm(self,instr):
         if type(instr).__name__ != "ASM_Label" and type(instr).__name__ != "ASM_Comment":
             self.outfile.write("\t\t\t\t")
-        if type(instr).__name__ == "ASM_Comment":
-            if instr.tabbed:
-                self.outfile.write("\t\t\t\t")
 
         match instr:
             case ASM_Comment(comment):
-                return ";;\t" + comment
+                return ";;" + comment
             case ASM_Label(label):
                 return label + ":"
             case ASM_Li(reg, imm):
@@ -124,6 +124,14 @@ class CoolAsmGen:
                 return f"mov {dest} <- {src}"
             case ASM_Add(dst, left, right):
                 return f"add {dst} <- {left} {right}"
+
+            case ASM_Call_Reg(reg):
+                return f"call {reg}"
+
+            case ASM_St(dest,src,offset):
+                return f"st {dest}[{offset}] <- {src}"
+            case ASM_La(reg, label):
+                return f"la {reg} <- {label}"
             case ASM_Alloc(dest,src):
                 return f"alloc {dest} {src}"
             case ASM_Constant_label(label):
@@ -162,12 +170,10 @@ class CoolAsmGen:
 
     def emit_constructors(self):
 
-        self_reg = "r0"
-        acc_reg = "r1"
 
         self.comment("CONSTRUCTORS")
         for cls,attrs in self.class_map.items():
-            self.add_asm(ASM_Constant_label(label=f"{cls}..new"))
+            self.add_asm(ASM_Label(label=f"{cls}..new"))
             """
             1. allocate new space for new object
             2. set up the fields in the new object
@@ -186,12 +192,51 @@ class CoolAsmGen:
             
             """
 
+            self_reg = "r0"
+            acc_reg = "r1"
+            temp_reg = "r2"
+            temp1_reg = temp_reg
+            temp2_reg = "r3"
+
             # adding 1 for v table ptr.
             size = len(attrs) + 1
             # load immediate to alloc object layout.
             # emit first real cool asswmbly istrucionts.
+            self.comment(f"\t\t\t\talloc {size} words of memory for object layout.")
             self.add_asm(ASM_Li(reg = self_reg, imm = size))
-            self.add_asm(ASM_Alloc(dest = self_reg, src = size))
+            self.add_asm(ASM_Alloc(dest = self_reg, src = self_reg))
+
+            # store vtable pointer
+
+            self.comment("\t\t\t\tVTable")
+            self.add_asm(ASM_La(temp_reg, f"{cls}..vtable"))
+            self.add_asm(ASM_St(self_reg, temp_reg, 0))
+
+            # attributes
+            if attrs:
+                self.comment("\t\t\t\tAttributes")
+            for i,attr in enumerate(attrs, start=1):
+                # FIXME: calling convention stuff
+                if attr.Type == "Unboxed_Int":
+                    self.comment(f"\t\t\t\tStore int {0} in object layout for Int.")
+                    self.add_asm(ASM_Li(acc_reg,0))
+                else:
+                    self.add_asm(ASM_La(temp_reg, f"{attr.Type}..new"))
+                    self.add_asm(ASM_Call_Reg(temp_reg))
+
+                self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = i))
+
+            #initializers
+            for i,attr in enumerate(attrs, start=1):
+                if attr.Type == "Unboxed_Int":
+                    continue
+                exp = attr.Initializer[1]
+                self.comment(f"\t\t\t\tdo cgen (TAC?) here for {exp}" )
+                self.comment(f"\t\t\t\tResult should be in r1 (acc) register." )
+                self.add_asm(ASM_St(self_reg,acc_reg,i))
+                # print(attr.Initializer)
+
+
 
     def emit_methods(self):
         self.comment("METHODS")
@@ -199,30 +244,20 @@ class CoolAsmGen:
 
 
 
-    #convert TAC to ASM
-    def emit(self,instr):
+    # convert TAC to ASM
+    # generate code for e, put on accumulator register.
+    # leave stack the way we found it (good behaviour)
+    def cgen(self, instr):
         # print(type(instr).__name__)
-        match type(instr).__name__:
-            case "TAC_Comment":
-                self.comment(instr.Comment)
-            case "TAC_Label":
-                self.outfile.write(f"{instr.Label}: \n")
-            case "TAC_Assign_Int":
-                self.comment("new Int")
-            case "TAC_Assign_Plus":
-                """
-                cgen(e1)
-                push r1
-                cgen(e2)
-                pop t1
-                add r1 <- t1 r1
-                """
+        self.comment(f"\t\t\t\tDO CGEN HERE FOR EXPRESSION {instr}")
+        match type(instr):
+
             case _:
                 print("UNHANDLED: ",instr)
                 sys.exit(1)
 
-    def comment(self,comment,tabbed=False):
-        self.asm_instructions.append(ASM_Comment(comment=comment,tabbed=tabbed))
+    def comment(self,comment):
+        self.asm_instructions.append(ASM_Comment(comment=comment))
 
 if __name__ == "__main__":
     coolAsmGen = CoolAsmGen(sys.argv[1])
