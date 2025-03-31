@@ -55,7 +55,7 @@ class AnnotatedAstReader:
         return Case_element(var, type, body, None)
 
     def read_exp(self):
-        eloc = self.read() 
+        eloc = self.read()
         ekind = self.read_ekind(0)
         return (eloc, ekind)
 
