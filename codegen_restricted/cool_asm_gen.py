@@ -234,6 +234,8 @@ class CoolAsmGen:
 
     def emit_constructors(self):
         self.comment("CONSTRUCTORS")
+        self.comment("These will allocate memory (based on object layout gone over in class),")
+        self.comment("and will return the object.")
         for cls,attrs in self.class_map.items():
             self.add_asm(ASM_Label(label=f"{cls}..new"))
             """
@@ -259,7 +261,7 @@ class CoolAsmGen:
             size = len(attrs) + 1
             # load immediate to alloc object layout.
             # emit first real cool asswmbly istrucionts.
-            self.comment(f"\t\t\t\talloc {size} words of memory for object layout.")
+            self.comment(f"\t\t\t\tallocating {size} words of memory for object layout for class {cls}.")
             self.add_asm(ASM_Li(reg = self_reg, imm = size))
             self.add_asm(ASM_Alloc(dest = self_reg, src = self_reg))
 
@@ -267,43 +269,50 @@ class CoolAsmGen:
 
             self.comment("\t\t\t\tVTable")
             self.add_asm(ASM_La(temp_reg, f"{cls}..vtable"))
+
+            # store address of vtable in this slot
             self.add_asm(ASM_St(self_reg, temp_reg, 0))
 
-            # attributes
+            # attributes - default initializer
             if attrs:
-                self.comment("\t\t\t\tAttributes")
-            for i,attr in enumerate(attrs, start=1):
+                self.comment("\t\t\t\tAttributes - default allocation")
+            for attr_index,attr in enumerate(attrs, start=1):
                 # FIXME: calling convention stuff
                 self.comment("\t\t\t\tFIXME: calling convention stuff")
 
                 # we are in Int Class.
+                # we need to store the raw int value in an attribute.
                 if attr.Type == "Unboxed_Int":
-                    self.comment(f"\t\t\t\tStore int {0} in object layout for Int.")
+                    self.comment(f"\t\t\t\tStore raw int {0} for attribute in Int.")
                     self.add_asm(ASM_Li(acc_reg,0))
                 else:
-                    # call constrsuctor for attribute type.
+                    # call constructor for attribute type.
                     self.add_asm(ASM_La(temp_reg, f"{attr.Type}..new"))
                     self.add_asm(ASM_Call_Reg(temp_reg))
 
-                self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = i))
+                # store attribute in allocated self object.
+                self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
 
-            #initializers
+            #initializers - explicit user defined.
             if attrs:
-                self.comment("\t\t\t\tInitializers")
-            for i,attr in enumerate(attrs, start=1):
+                self.comment("\t\t\t\tInitializers- overwriting attributes if defined.")
+            for attr_index,attr in enumerate(attrs, start=1):
                 if attr.Type == "Unboxed_Int":
-                    continue
+                    continue # already initialized this to 0.
+
                 exp = attr.Initializer[1]
-                # self.comment(f"\t\t\t\tdo cgen (TAC?) here for {exp}" )
+                # generate code for the initializer and put it in r1 (accumulator)
                 self.cgen(exp)
                 # store the result of cgen in an attribute slot.
-                self.add_asm(ASM_St(self_reg,acc_reg,i))
-                # print(attr.Initializer)
+                self.comment(f"\t\t\t\t Initialized {attr}")
+                self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
 
             self.comment("\t\t\t\tFIXME: calling convention stuff")
 
             self.comment("\t\t\t\treturn the new object")
             self.add_asm(ASM_Mov(acc_reg,self_reg))
+
+            self.comment("\t\t\t\tJump to address in ra.")
             self.add_asm(ASM_Return())
 
 
@@ -327,19 +336,15 @@ class CoolAsmGen:
         self.comment("\t\t\t\tFIXME: calling convention stuff")
         self.add_asm(ASM_Return())
 
-    # convert TAC to ASM
     # generate code for e, put on accumulator register.
     # leave stack the way we found it (good behaviour)
-    # how exactly do we take advantage of TAC?
     def cgen(self, exp):
         # we need to change this when adding tags and size in the object layout.
         vtable_index = 0
         attr_start_index = 1
 
-        # print(type(instr).__name__)
         self.comment(f"\t\t\t\tdoing cgen for {exp}")
         match exp:
-            # when we encounter an ordinary variable in TAC.
             case Identifier(Var):
 
                 match self.symbol_table[Var]:
@@ -351,12 +356,12 @@ class CoolAsmGen:
                         self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
 
             case Integer(Integer=val, StaticType=st):
-                print("codegen: ", exp)
-                # ?
-                # make new int , fill with actual value.
+                # make new int , (default initialized with 0)
+                self.comment("\t\t\t\tWe are making an int, so we need an Int object.")
                 self.cgen(New(Type="Int",StaticType="Int"))
                 # access secrete fields :)
-                self.comment("\t\t\t\t we just generated a new int, now we putting the actual value in attribute. :)")
+                # right now, this depends on the fact that the location of the raw int is the first attribute index.
+                self.comment("\t\t\t\t we just generated a new int, now we putting the raw value in first attribute. :)")
                 self.add_asm(ASM_St(acc_reg,val,attr_start_index))
 
             case Plus(Left,Right):
@@ -378,16 +383,13 @@ class CoolAsmGen:
                 UNBOXED
                 store acc[1] <- temp
                 """
-                # result in accumulator
+                # Code gen full-fledged cool integer objects.
                 self.cgen(Left)
-                # push result onto stack
                 self.add_asm(ASM_Push(acc_reg))
                 self.cgen(Right)
-                # result in acc, get the left expression from stack.
                 self.add_asm(ASM_Pop(temp_reg))
 
                 # load unboxed integers (raw values).
-                # loads value in src[offset] into dest.
                 self.add_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
@@ -396,7 +398,7 @@ class CoolAsmGen:
 
                 self.add_asm(ASM_Add(temp_reg,acc_reg,temp_reg))
 
-                #save result
+                # save result
                 self.add_asm(ASM_Push(temp_reg))
                 # now in acc.
                 self.cgen(New(Type="Int", StaticType="Int"))
@@ -407,6 +409,7 @@ class CoolAsmGen:
                     dest = acc_reg,
                     src = temp_reg,
                     offset = attr_start_index))
+
             case New(Type):
                 self.comment("\t\t\t\tFIXME: calling convention stuff")
                 # going to put result in ra register.
@@ -432,13 +435,16 @@ class CoolAsmGen:
                 # receiever object in acc.
                 # e.g: someone wants to invoke "out_int" or "main"
                 # emit code to lookup in vtable.
+                self.comment("\t\t\t\tLoading v table.")
                 self.add_asm(ASM_Ld(dest=temp_reg,src=acc_reg,offset=vtable_index))
 
                 class_name = Exp.Type
                 method_name = Method.str
                 method_vtable_index = self.vtable_method_indexes[(class_name,method_name)]
                 # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
+                self.comment(f"\t\t\t\t{class_name}.{method_name} lives at vindex {method_vtable_index}")
                 self.add_asm(ASM_Ld(temp_reg,temp_reg,method_vtable_index))
+                self.comment(f"\t\t\t\tIndirectly call the method.")
                 self.add_asm(ASM_Call_Reg(temp_reg))
                 self.comment("\t\t\t\tFIXME: calling convention stuff")
 
