@@ -1,8 +1,6 @@
 from ast_nodes import *
 import sys
 
-
-
 class AnnotatedAstReader:
     def __init__(self,filename):
         self.filename = filename
@@ -13,7 +11,6 @@ class AnnotatedAstReader:
         self.parent_map = {}
         self.direct_methods = {}
 
-        # self.act_recs = 0 # keep track of activation records
         self.read_lines()
 
     def parse(self):
@@ -26,7 +23,6 @@ class AnnotatedAstReader:
     
     def read_lines(self):
         sys.setrecursionlimit(20000)
-        # fname = sys.argv[1] 
         with open(self.filename) as file:
             self.lines = [line.rstrip("\r\n") for line in file] 
 
@@ -167,7 +163,7 @@ class AnnotatedAstReader:
         elif ekind == 'internal':
             body = self.read()
             return Internal(body, static_type)
-        else: 
+        else:
             raise (Exception(f"read_ekind: {ekind} unhandled"))
 
     def read_class_map(self):

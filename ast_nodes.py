@@ -1,9 +1,5 @@
 from collections import namedtuple
 
-# named tuple has the type specified by the first argument
-# second argument contaisn the fields, that can be delineated by whitespace and in a single string
-#   these fields can be accessed using dot operator
-#   can also refer to the fields by position when initializing a namedtuple.
 CoolClass = namedtuple("CoolClass", "Name Inherits Features")
 Attribute = namedtuple("Attribute", "Name Type Initializer") 
 Method = namedtuple("Method", "Name Formals ReturnType Body")
@@ -52,5 +48,4 @@ Let_Init = namedtuple("Let_Init", "Var Type Exp")
 Case = namedtuple("Case", "Exp Elements StaticType")
 Case_element = namedtuple("Case_element", "Var Type Body StaticType")
 
-# PA3
 Internal = namedtuple("Internal", "Body StaticType")
