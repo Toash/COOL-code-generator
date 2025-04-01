@@ -56,22 +56,20 @@ Register = namedtuple("Register","reg")
 Offset = namedtuple("Offset","reg offset")
 
 """
-STACK MACHINE CONVENTION:
-Cool-ASM has:
-8 General registers
-3 special ones
-    stack pointer (sp)
-    frame pointer (fp)
-    return address
+COOL ASM STACK MACHINE CONVENTION:
+Note: in cool-asm, stack pointers to unused memory sp[1] is the top of the stack.
+Stack should be the same before and after a method call.
 
-Address of next instruction is stored in ra
-on x86, it will be stored on the stack by the call instruction.
+Next address stored in ra
+- pop when calling function
+- after function ends (stack has to be the same), 
 
-On function call, push parameters on stack
-caller set next instruction in ra. 
+On function call, 
+- push parameters on stack
+- push receiver object. 
 
-when in callee, set stack pointer to frame pointer
-push ra (the next instruction from caller) onto stack.
+Note: return jumps to ra.
+so after function ends (and stack is the same before call, pop ra then return.)
 """
 class CoolAsmGen:
     def __init__(self,file):
@@ -79,11 +77,10 @@ class CoolAsmGen:
             self.file = file
             self.asm_instructions = []
 
-
             # maps variable to member locations.
             # variable could live in register
             # or offset ( fp[4] )
-            self.symbol_table = {}
+            self.symbol_stack = [{}]
             # store index with <type, mname>
             # to lookup when emitting code for dispatch
             self.vtable_method_indexes = {}
@@ -106,9 +103,7 @@ class CoolAsmGen:
             # attributes
             self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
 
-            #intiialize x for outint and stuff?
-            # FIXME: This is probably wrong.
-            # self.symbol_table["x"] = Register("r4")
+
 
             # from pprint import pprint
             # print("CLASS MAP:")
@@ -276,8 +271,10 @@ class CoolAsmGen:
             self.add_asm(ASM_Alloc(dest = self_reg, src = self_reg))
 
             # store vtable pointer
-
             self.comment("\t\t\t\tVTable")
+            vtable_index = 0
+
+            self.comment(f"\t\t\t\tStore vtable pointer at index {vtable_index}")
             self.add_asm(ASM_La(temp_reg, f"{cls}..vtable"))
 
             # store address of vtable in this slot
@@ -340,12 +337,17 @@ class CoolAsmGen:
             num_args = len(imp)-1
             exp = imp[-1][1]
             self.add_asm(ASM_Label(f"{cname}.{mname}"))
+
+            # set up base pointer address.
             self.add_asm(ASM_Mov("fp","sp"))
 
             # caller has pushed: arg1, arg2, arg3 receiver_object
             # receiver object is top of stack!!
             # so we want to set "self" <- receiver object
+            self.comment("\t\t\t\tPresumably, caller has pushed arguments,then receiver object on stack.")
+            self.comment("\t\t\t\tLoad receiver object into r0 (receiver object is on top of stack).")
             self.add_asm(ASM_Ld(self_reg,"sp",1))
+            self.comment("\t\t\t\tPush return address (call instruction automatically stores it in ra.)")
             self.add_asm(ASM_Push("ra"))
 
             # when we call Point.setX(newX : Integer)
@@ -355,19 +357,29 @@ class CoolAsmGen:
             # second, and overriding all of setX's formals
             #   -- live at offsets from the frame pointer
 
+            self.push_scope()
+
             # step 1 - fields / attr in scope
             # print(f"Class map for {cname}:",self.class_map[cname])
             for index,attr in enumerate(self.class_map[cname],start=1):
-                print("attr:",attr)
-                self.symbol_table[attr.Name] = Offset(self_reg,index)
+                if index==1:
+                    self.comment("\t\t\t\tSetting up addresses for attributes (based off offsets from self reg)")
+                # self.symbol_stack[attr.Name] = Offset(self_reg, index)
+                self.comment(f"\t\t\t\tSetting up attribute, it lives in {self_reg}[{z}]")
+                self.insert_symbol(attr.Name , Offset(self_reg, index))
 
             # step 2 - formals in scope
             for index,arg in enumerate(imp[:-1],start=1):
+                if index == 1:
+                    self.comment("\t\t\t\tSetting up addresses for arguments (based off frame pointer reg)")
                 # + 1 because of self object
                 # get offset from frame pointer for arguments.
                 z=num_args+1-index + 1
                 # these formals live at at offset of the frame pointer.
-                self.symbol_table[arg] = Offset("fp", z)
+                # self.symbol_stack[arg] = Offset("fp", z)
+                print(f"{arg} lives in fp[{z}]")
+                self.comment(f"\t\t\t\tSetting up argument {arg}, it lives in fp[{z}]")
+                self.insert_symbol(arg, Offset("fp", z))
 
             # call method body.
             self.cgen(exp)
@@ -381,7 +393,14 @@ class CoolAsmGen:
             self.add_asm(ASM_Li(temp_reg,z))
 
             # add sp <- sp z
-            self.add_asm(ASM_Add("sp","sp",z))
+            self.comment("\t\t\t\tdeallocating stack frame.")
+
+            self.add_asm(ASM_Add("sp","sp",temp_reg))
+
+            self.pop_scope()
+
+
+
             self.add_asm(ASM_Return())
 
 
@@ -390,7 +409,7 @@ class CoolAsmGen:
         self.add_asm(ASM_Label("start"))
         exp = Dynamic_Dispatch(Exp=New(Type="Main",StaticType="Main"), Method = ID(loc=0,str="main"), Args=[],StaticType="Main")
 
-        self.add_asm(ASM_Push("ra"))
+        # self.add_asm(ASM_Push("ra"))
         self.cgen(exp)
         self.add_asm(ASM_Ld("ra", "sp", 1))
 
@@ -402,20 +421,32 @@ class CoolAsmGen:
         # we need to change this when adding tags and size in the object layout.
         attr_start_index = 1
 
-        self.comment(f"\t\t\t\tcgen: {exp}")
+        self.comment(f"\t\t\t\tcgen+: {type(exp).__name__}")
 
-        self.comment(f"\t\t\t\tsymbol_table: {self.symbol_table}")
+        locs = []
+        for var, loc in self.symbol_stack[-1].items():
+            match loc:
+                case Register(reg):
+                    locs.append(f"{var}={reg}")
+                case Offset(reg,loc):
+                    locs.append(f"{var}={reg}[{loc}]")
+
+        self.comment(f"\t\t\tsymbol_table in current scope: {locs}")
+
         match exp:
+            # look up in symbol table, if found, store in accumulator.
             case Identifier(Var):
 
-                match self.symbol_table.get(Var):
+                match self.lookup_symbol(Var):
                     case Register(reg):
                         # print(f"Found variable in register {reg}")
                         self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
                     case Offset(reg,offset):
                         # print(f"Found variable in register {reg} at offset {offset}")
                         self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
-
+                    case _:
+                        print(f"Could not find identifier {Var}")
+                        self.add_asm(ASM_Mov(dest=acc_reg, src="NOT_FOUND" ))
 
             case Integer(Integer=val, StaticType=st):
                 # make new int , (default initialized with 0)
@@ -423,13 +454,13 @@ class CoolAsmGen:
                 self.cgen(New(Type="Int",StaticType="Int"))
                 # access secrete fields :)
                 # right now, this depends on the fact that the location of the raw int is the first attribute index.
-                self.comment("\t\t\t\t we just generated a new int, now we putting the raw value in first attribute. :)")
-                self.add_asm(ASM_St(acc_reg,val,attr_start_index))
+                self.comment(f"\t\t\t\t put {val} in the first attribute for a Cool Int Object :)")
+                self.add_asm(ASM_Li(temp_reg,val))
+                self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
 
                 # an integer object  with the value in the first attribute is not on the stack.
 
             case Plus(Left,Right):
-                print("plus")
                 """
                 cgen left
                 push acc
@@ -455,25 +486,34 @@ class CoolAsmGen:
                 self.add_asm(ASM_Pop(temp_reg))
 
                 # load unboxed integers (raw values).
+                self.comment("\t\t\t\tLoad unboxed integers.")
                 self.add_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
                     offset = attr_start_index))
                 self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
 
+                # add the raw values.
+                self.comment("\t\t\t\tAdd unboxed integers.")
                 self.add_asm(ASM_Add(temp_reg,acc_reg,temp_reg))
 
                 # save result
+                self.comment("\t\t\t\tPush result of adding on the stack.")
                 self.add_asm(ASM_Push(temp_reg))
                 # now in acc.
+                self.comment("\t\t\t\tCreate new Int Object.")
                 self.cgen(New(Type="Int", StaticType="Int"))
+                self.comment("\t\t\t\tPop previously saved addition result off of stack.")
                 self.add_asm(ASM_Pop(temp_reg))
+
                 # store unboxed int in the new int
                 # stores value in src to dest[offset]
+                self.comment("\t\t\t\tStore unboxed int int new Int Object.")
                 self.add_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
                     offset = attr_start_index))
+
 
             case New(Type):
                 self.add_asm(ASM_Push("fp"))
@@ -488,35 +528,56 @@ class CoolAsmGen:
             case Self_Dispatch(Method,Args):
                 self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
             case Internal(Body):
-                self.cgen(Identifier(Var="x",StaticType="idk"))
-                # load unboxed int
-                self.add_asm(ASM_Ld(acc_reg,acc_reg,attr_start_index))
-                self.add_asm(ASM_Syscall("IO.out_int"))
-                # FIXME
 
-                pass
+                if Body == "IO.out_int":
+                    # in the case of out_int, x should be an integer.
+                    self.cgen(Identifier(Var="x", StaticType=None))
+                    # load unboxed int
+                    self.add_asm(ASM_Ld(acc_reg, acc_reg, attr_start_index))
+                    self.add_asm(ASM_Comment("out_int writes the raw integer in r1 to standard output."))
+                    self.add_asm(ASM_Syscall(Body))
+                else:
+                    # print("Unhandled Internal: ",Body)
+                    pass
             case _:
                 # print("Unknown expression in cgen: ", exp)
                 pass
 
+        self.comment(f"\t\t\t\tcgen-: {type(exp).__name__}")
+
+
     def gen_dispatch_helper(self, Exp, Method, Args):
         vtable_index = 0
         self.add_asm(ASM_Push("fp"))
+        # args has line numbers and we need to skip them.
+
+        """
+        Here how the stack frame look like:
+        arg 1,
+        arg 2,
+        arg n....
+        receiver object
+        """
+        self.comment("\t\t\t\tPush arguments on the stack.")
         for arg in Args:
             self.cgen(arg[1]) # skip line number
             self.add_asm(ASM_Push(acc_reg))
+
+        self.comment("\t\t\t\tPush receiver on the stack.")
         if Exp:
             self.cgen(Exp)
             self.add_asm(ASM_Push(acc_reg))
         else:
+            # object on which current method is invoked.
             self.add_asm(ASM_Push(self_reg))
+
         """
         1. load RO (acc) vtable into (temp)
         2. load the vtable index into (temp2)
         3. temp <- temp[temp2] -- get method pointer
         4. call temp
         """
-        # receiever object in acc.
+        # receiver object in acc.
         # e.g: someone wants to invoke "out_int" or "main"
         # emit code to lookup in vtable.
         self.comment("\t\t\t\tLoading v table.")
@@ -527,7 +588,7 @@ class CoolAsmGen:
         # This should always access - unless we have a problem.
         method_vtable_index = self.vtable_method_indexes[(class_name, method_name)]
         # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
-        self.comment(f"\t\t\t\t{class_name}.{method_name} lives at vindex {method_vtable_index}")
+        self.comment(f"\t\t\t\t{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
         self.add_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
         self.comment(f"\t\t\t\tIndirectly call the method.")
         self.add_asm(ASM_Call_Reg(temp_reg))
@@ -537,6 +598,23 @@ class CoolAsmGen:
 
     def comment(self,comment):
         self.asm_instructions.append(ASM_Comment(comment=comment))
+
+    # call when entering new expression
+    def push_scope(self):
+        self.symbol_stack.append({})
+    def pop_scope(self):
+        self.symbol_stack.pop()
+
+    def insert_symbol(self, symbol, loc):
+        self.symbol_stack[-1][symbol] = loc
+
+    def lookup_symbol(self, symbol):
+        for scope in reversed(self.symbol_stack):
+            if symbol in scope:
+                return scope[symbol]
+        return None
+        # print (f"Could not find symbol {symbol} in scope!")
+        # sys.exit(1)
 
 if __name__ == "__main__":
     coolAsmGen = CoolAsmGen(sys.argv[1])
