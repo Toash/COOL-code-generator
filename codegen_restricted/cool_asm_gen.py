@@ -57,6 +57,11 @@ Offset = namedtuple("Offset","reg offset")
 
 """
 COOL ASM STACK MACHINE CONVENTION:
+
+Calling convention - on function exit, sp is same as it was on entry.
+Need return address (ra)
+pointer to start of current activation (fp)
+
 Note: in cool-asm, stack pointers to unused memory sp[1] is the top of the stack.
 Stack should be the same before and after a method call.
 
@@ -284,8 +289,6 @@ class CoolAsmGen:
             if attrs:
                 self.comment("\t\t\t\tAttributes - default allocation")
             for attr_index,attr in enumerate(attrs, start=1):
-                # FIXME: calling convention stuff
-                self.comment("\t\t\t\tFIXME: calling convention stuff")
 
                 # we are in Int Class.
                 # we need to store the raw int value in an attribute.
@@ -293,10 +296,7 @@ class CoolAsmGen:
                     self.comment(f"\t\t\t\tStore raw int {0} for attribute in Int.")
                     self.add_asm(ASM_Li(acc_reg,0))
                 else:
-                    # call constructor for attribute type.
-                    self.add_asm(ASM_La(temp_reg, f"{attr.Type}..new"))
-                    self.add_asm(ASM_Call_Reg(temp_reg))
-
+                    self.cgen(New(Type=attr.Type))
                 # store attribute in allocated self object.
                 self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
 
@@ -314,7 +314,6 @@ class CoolAsmGen:
                 self.comment(f"\t\t\t\t Initialized {attr}")
                 self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
 
-            self.comment("\t\t\t\tFIXME: calling convention stuff")
 
             self.comment("\t\t\t\treturn the new object")
             self.add_asm(ASM_Mov(acc_reg,self_reg))
@@ -407,10 +406,14 @@ class CoolAsmGen:
         # the special start method.
         self.comment("\n\n-=-=-=-=-=-=-=-=-  PROGRAM STARTS HERE  -=-=-=-=-=-=-=-=-")
         self.add_asm(ASM_Label("start"))
-        exp = Dynamic_Dispatch(Exp=New(Type="Main",StaticType="Main"), Method = ID(loc=0,str="main"), Args=[],StaticType="Main")
-
+        # exp = Dynamic_Dispatch(Exp=New(Type="Main",StaticType="Main"), Method = ID(loc=0,str="main"), Args=[],StaticType="Main")
         # self.add_asm(ASM_Push("ra"))
-        self.cgen(exp)
+        # self.cgen(exp)
+
+        self.add_asm(ASM_Call_Label("Main..new"))
+        self.add_asm(ASM_Push(acc_reg))
+        self.add_asm(ASM_Call_Label("Main.main"))
+
         self.add_asm(ASM_Ld("ra", "sp", 1))
 
         self.add_asm(ASM_Syscall("exit"))
@@ -421,7 +424,7 @@ class CoolAsmGen:
         # we need to change this when adding tags and size in the object layout.
         attr_start_index = 1
 
-        self.comment(f"\t\t\t\tcgen+: {type(exp).__name__}")
+        self.comment(f"\t\t\t\tcgen+: {exp}")
 
         locs = []
         for var, loc in self.symbol_stack[-1].items():
@@ -517,9 +520,11 @@ class CoolAsmGen:
 
             case New(Type):
                 self.add_asm(ASM_Push("fp"))
+                self.add_asm(ASM_Push(self_reg))
                 # going to put result in ra register.
                 # constructor has no arguments and no self object.
                 self.add_asm(ASM_Call_Label(f"{Type}..new"))
+                self.add_asm(ASM_Pop(self_reg))
                 self.add_asm(ASM_Pop("fp"))
 
             # Dispatch
@@ -569,6 +574,8 @@ class CoolAsmGen:
             self.add_asm(ASM_Push(acc_reg))
         else:
             # object on which current method is invoked.
+            self.comment("should this be main? for main.out_int")
+            self.add_asm(ASM_Mov(acc_reg,self_reg))
             self.add_asm(ASM_Push(self_reg))
 
         """
