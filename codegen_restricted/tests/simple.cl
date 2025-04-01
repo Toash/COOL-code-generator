@@ -1,6 +1,6 @@
 class Main inherits IO{
     main():Object{
-        out_int(9+10)
+        out_int(1337)
 
     };
 };

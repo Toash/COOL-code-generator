@@ -86,63 +86,52 @@ class CoolAsmGen:
             # variable could live in register
             # or offset ( fp[4] )
             self.symbol_stack = [{}]
+
             # store index with <type, mname>
             # to lookup when emitting code for dispatch
             self.vtable_method_indexes = {}
 
             # keep track of current_class for self_dispatch.
+            # because we need the type to call the constructor.
             self.current_class = None
 
-            self.env = {}
-            self.next_stack_offset = 1
-
-            # asm_file = self.file.replace(".cl-type",".cl-asm")
-            asm_file = "!MY_COOL_ASM.cl-asm"
+            asm_file = self.file.replace(".cl-type",".cl-asm")
             self.outfile = open(asm_file,"w")
 
-            # tac_gen = TacGen.TacGen(file)
             parser = AnnotatedAstReader(file)
             self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
-
 
             # attributes
             self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
 
-
-
             # from pprint import pprint
-            # print("CLASS MAP:")
-            # pprint( self.class_map)
-            # print("IMPLEMENTATION MAP:")
-            # pprint( self.imp_map)
-            # print("PARENT MAP:")
-            # pprint( self.parent_map)
-            # print("DIRECT METHODS:")
-            # pprint(self.direct_methods)
 
             self.emit_vtables()
             self.emit_constructors()
             self.emit_methods()
-
-            # pprint(self.vtable_method_indexes)
-
-            # Starting point?
-            # self.comment("START")
-            # for instr in self.tac_instructions:
-            #     # print(instr)
-            #     self.emit(instr)
 
             self.flush_asm()
 
         finally:
             self.outfile.close()
 
-    def reset_env(self):
-        self.env = {}
-        self.next_stack_offset = 1
+    def get_asm(self,include_comments = False):
+        asm_instructions_no_comments = []
+
+        # lol
+        if not include_comments:
+            for asm_instr in self.asm_instructions:
+                if(not isinstance(asm_instr,ASM_Comment)):
+                    asm_instructions_no_comments.append(asm_instr)
+
+        if not include_comments:
+            return asm_instructions_no_comments
+        else:
+            return self.asm_instructions
 
     def add_asm(self,instr):
         self.asm_instructions.append(instr)
+
 
     # write to file
     def flush_asm(self):
@@ -414,7 +403,7 @@ class CoolAsmGen:
         self.add_asm(ASM_Push(acc_reg))
         self.add_asm(ASM_Call_Label("Main.main"))
 
-        self.add_asm(ASM_Ld("ra", "sp", 1))
+        # self.add_asm(ASM_Ld("ra", "sp", 1))
 
         self.add_asm(ASM_Syscall("exit"))
 
