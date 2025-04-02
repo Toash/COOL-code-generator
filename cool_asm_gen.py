@@ -327,7 +327,7 @@ class CoolAsmGen:
                 z=num_args+1-index + 1
                 # these formals live at at offset of the frame pointer.
                 # self.symbol_stack[arg] = Offset("fp", z)
-                print(f"{arg} lives in fp[{z}]")
+                # print(f"{arg} lives in fp[{z}]")
                 self.comment(f"\t\t\t\tSetting up argument {arg}, it lives in fp[{z}]")
                 self.insert_symbol(arg, Offset("fp", z))
 
