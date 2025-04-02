@@ -77,7 +77,7 @@ class CoolAsmGen:
         finally:
             self.outfile.close()
 
-    def get_asm(self,include_comments = False):
+    def get_asm(self,include_comments = True):
         asm_instructions_no_comments = []
 
         # lol
@@ -101,16 +101,24 @@ class CoolAsmGen:
             self.outfile.write(self.format_asm(instr) + "\n")
 
     def format_asm(self,instr):
+        tabs="\t\t"
+
+
         if type(instr).__name__ != "ASM_Label" and type(instr).__name__ != "ASM_Comment":
-            self.outfile.write("\t\t\t\t")
+            self.outfile.write(tabs)
 
         match instr:
-            case ASM_Comment(comment):
+            case ASM_Comment(comment,not_tabbed):
                 import re
 
                 result = re.sub(r"^(\s*)", r"\1;;\t", comment)
-                return result
-                # return ";;" + comment
+
+                #lol
+                if not not_tabbed:
+                    return tabs+result
+                else:
+                    return result
+
             case ASM_Label(label):
                 return label + ":"
             case ASM_Li(reg, imm):
@@ -155,10 +163,10 @@ class CoolAsmGen:
 
     # Loop through classes in imp map for their methods
     def emit_vtables(self):
-        self.comment("VIRTUAL TABLES")
-        self.comment("constants will represent .quad in x86")
-        self.comment("they will represent 8 byte delineations in memory.")
-        self.comment("key insight for dynamic dispatch to work correctly: method ordering should be the same")
+        self.comment("VIRTUAL TABLES",not_tabbed=True)
+        self.comment("constants will represent .quad in x86",not_tabbed=True)
+        self.comment("they will represent 8 byte delineations in memory.",not_tabbed=True)
+        self.comment("key insight for dynamic dispatch to work correctly: method ordering should be the same",not_tabbed=True)
         for cls in self.class_map:
             index = 0
             # self.outfile.write( # label
@@ -192,9 +200,9 @@ class CoolAsmGen:
 
 
     def emit_constructors(self):
-        self.comment("CONSTRUCTORS")
-        self.comment("These will allocate memory (based on object layout gone over in class),")
-        self.comment("and will return the object.")
+        self.comment("CONSTRUCTORS",not_tabbed=True)
+        self.comment("These will allocate memory (based on object layout gone over in class),",not_tabbed=True)
+        self.comment("and will return the object.",not_tabbed=True)
         for cls,attrs in self.class_map.items():
             self.add_asm(ASM_Label(label=f"{cls}..new"))
             """
@@ -213,6 +221,14 @@ class CoolAsmGen:
             attributes
             ....
             """
+            # FIXME: save old frame pointer
+            # after returning, will restore ( so caller can also deallocate)
+            # self.add_asm(ASM_Push("fp"))
+            # stack room for temporaries
+            
+
+
+
             # set up frame pointer (will use to refer to variables later.)
             self.add_asm(ASM_Mov("fp","sp"))
             # save return address
@@ -222,15 +238,15 @@ class CoolAsmGen:
             size = len(attrs) + 1
             # load immediate to alloc object layout.
             # emit first real cool asswmbly istrucionts.
-            self.comment(f"\t\t\t\tallocating {size} words of memory for object layout for class {cls}.")
+            self.comment(f"allocating {size} words of memory for object layout for class {cls}.")
             self.add_asm(ASM_Li(reg = self_reg, imm = size))
             self.add_asm(ASM_Alloc(dest = self_reg, src = self_reg))
 
             # store vtable pointer
-            self.comment("\t\t\t\tVTable")
+            self.comment("VTable")
             vtable_index = 0
 
-            self.comment(f"\t\t\t\tStore vtable pointer at index {vtable_index}")
+            self.comment(f"Store vtable pointer at index {vtable_index}")
             self.add_asm(ASM_La(temp_reg, f"{cls}..vtable"))
 
             # store address of vtable in this slot
@@ -238,13 +254,13 @@ class CoolAsmGen:
 
             # attributes - default initializer
             if attrs:
-                self.comment("\t\t\t\tAttributes - default allocation")
+                self.comment("Attributes - default allocation")
             for attr_index,attr in enumerate(attrs, start=1):
 
                 # we are in Int Class.
                 # we need to store the raw int value in an attribute.
                 if attr.Type == "Unboxed_Int":
-                    self.comment(f"\t\t\t\tStore raw int {0} for attribute in Int.")
+                    self.comment(f"Store raw int {0} for attribute in Int.")
                     self.add_asm(ASM_Li(acc_reg,0))
                 else:
                     self.cgen(New(Type=attr.Type))
@@ -253,7 +269,7 @@ class CoolAsmGen:
 
             #initializers - explicit user defined.
             if attrs:
-                self.comment("\t\t\t\tInitializers- overwriting attributes if defined.")
+                self.comment("Initializers- overwriting attributes if defined.")
             for attr_index,attr in enumerate(attrs, start=1):
                 if attr.Type == "Unboxed_Int":
                     continue # already initialized this to 0.
@@ -262,14 +278,14 @@ class CoolAsmGen:
                 # generate code for the initializer and put it in r1 (accumulator)
                 self.cgen(exp)
                 # store the result of cgen in an attribute slot.
-                self.comment(f"\t\t\t\t Initialized {attr}")
+                self.comment(f"Initialized {attr}")
                 self.add_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
 
 
-            self.comment("\t\t\t\treturn the new object")
+            self.comment("return the new object")
             self.add_asm(ASM_Mov(acc_reg,self_reg))
 
-            self.comment("\t\t\t\tJump to address in ra.")
+            # self.comment("\t\t\t\tJump to address in ra.")
 
             # pop the return address.
             self.add_asm(ASM_Pop("ra"))
@@ -280,7 +296,7 @@ class CoolAsmGen:
 
 
     def emit_methods(self):
-        self.comment("METHODS")
+        self.comment("METHODS",not_tabbed=True)
 
         for (cname,mname), imp in self.direct_methods.items():
             self.current_class = cname
@@ -294,10 +310,10 @@ class CoolAsmGen:
             # caller has pushed: arg1, arg2, arg3 receiver_object
             # receiver object is top of stack!!
             # so we want to set "self" <- receiver object
-            self.comment("\t\t\t\tPresumably, caller has pushed arguments,then receiver object on stack.")
-            self.comment("\t\t\t\tLoad receiver object into r0 (receiver object is on top of stack).")
+            self.comment("Presumably, caller has pushed arguments,then receiver object on stack.")
+            self.comment("Load receiver object into r0 (receiver object is on top of stack).")
             self.add_asm(ASM_Ld(self_reg,"sp",1))
-            self.comment("\t\t\t\tPush return address (call instruction automatically stores it in ra.)")
+            # self.comment("\t\t\t\tPush return address (call instruction automatically stores it in ra.)")
             self.add_asm(ASM_Push("ra"))
 
             # when we call Point.setX(newX : Integer)
@@ -313,22 +329,22 @@ class CoolAsmGen:
             # print(f"Class map for {cname}:",self.class_map[cname])
             for index,attr in enumerate(self.class_map[cname],start=1):
                 if index==1:
-                    self.comment("\t\t\t\tSetting up addresses for attributes (based off offsets from self reg)")
+                    self.comment("Setting up addresses for attributes (based off offsets from self reg)")
                 # self.symbol_stack[attr.Name] = Offset(self_reg, index)
-                self.comment(f"\t\t\t\tSetting up attribute, it lives in {self_reg}[{z}]")
+                self.comment(f"Setting up attribute, it lives in {self_reg}[{z}]")
                 self.insert_symbol(attr.Name , Offset(self_reg, index))
 
             # step 2 - formals in scope
             for index,arg in enumerate(imp[:-1],start=1):
                 if index == 1:
-                    self.comment("\t\t\t\tSetting up addresses for arguments (based off frame pointer reg)")
+                    self.comment("Setting up addresses for arguments (based off frame pointer reg)")
                 # + 1 because of self object
                 # get offset from frame pointer for arguments.
                 z=num_args+1-index + 1
                 # these formals live at at offset of the frame pointer.
                 # self.symbol_stack[arg] = Offset("fp", z)
                 # print(f"{arg} lives in fp[{z}]")
-                self.comment(f"\t\t\t\tSetting up argument {arg}, it lives in fp[{z}]")
+                self.comment(f"Setting up argument {arg}, it lives in fp[{z}]")
                 self.insert_symbol(arg, Offset("fp", z))
 
             # call method body.
@@ -343,7 +359,7 @@ class CoolAsmGen:
             self.add_asm(ASM_Li(temp_reg,z))
 
             # add sp <- sp z
-            self.comment("\t\t\t\tdeallocating stack frame.")
+            self.comment("deallocating stack frame (this also removes the ra that was pushed earlier).")
 
             self.add_asm(ASM_Add("sp","sp",temp_reg))
 
@@ -355,7 +371,7 @@ class CoolAsmGen:
 
 
         # the special start method.
-        self.comment("\n\n-=-=-=-=-=-=-=-=-  PROGRAM STARTS HERE  -=-=-=-=-=-=-=-=-")
+        self.comment("\n\n-=-=-=-=-=-=-=-=-  PROGRAM STARTS HERE  -=-=-=-=-=-=-=-=-",not_tabbed=True)
         self.add_asm(ASM_Label("start"))
         # exp = Dynamic_Dispatch(Exp=New(Type="Main",StaticType="Main"), Method = ID(loc=0,str="main"), Args=[],StaticType="Main")
         # self.add_asm(ASM_Push("ra"))
@@ -375,17 +391,17 @@ class CoolAsmGen:
         # we need to change this when adding tags and size in the object layout.
         attr_start_index = 1
 
-        self.comment(f"\t\t\t\tcgen+: {exp}")
+        # self.comment(f"\t\t\t\tcgen+: {exp}")
 
-        locs = []
-        for var, loc in self.symbol_stack[-1].items():
-            match loc:
-                case Register(reg):
-                    locs.append(f"{var}={reg}")
-                case Offset(reg,loc):
-                    locs.append(f"{var}={reg}[{loc}]")
+        # locs = []
+        # for var, loc in self.symbol_stack[-1].items():
+        #     match loc:
+        #         case Register(reg):
+        #             locs.append(f"{var}={reg}")
+        #         case Offset(reg,loc):
+        #             locs.append(f"{var}={reg}[{loc}]")
 
-        self.comment(f"\t\t\tsymbol_table in current scope: {locs}")
+        # self.comment(f"\t\t\tsymbol_table in current scope: {locs}")
 
         match exp:
             # look up in symbol table, if found, store in accumulator.
@@ -404,11 +420,11 @@ class CoolAsmGen:
 
             case Integer(Integer=val, StaticType=st):
                 # make new int , (default initialized with 0)
-                self.comment("\t\t\t\tWe are making an int, so we need an Int object.")
+                self.comment("We are making an int, so we need an Int object.")
                 self.cgen(New(Type="Int",StaticType="Int"))
                 # access secrete fields :)
                 # right now, this depends on the fact that the location of the raw int is the first attribute index.
-                self.comment(f"\t\t\t\t put {val} in the first attribute for a Cool Int Object :)")
+                self.comment(f"put {val} in the first attribute for a Cool Int Object :)")
                 self.add_asm(ASM_Li(temp_reg,val))
                 self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
 
@@ -440,7 +456,7 @@ class CoolAsmGen:
                 self.add_asm(ASM_Pop(temp_reg))
 
                 # load unboxed integers (raw values).
-                self.comment("\t\t\t\tLoad unboxed integers.")
+                self.comment("Load unboxed integers.")
                 self.add_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
@@ -448,21 +464,21 @@ class CoolAsmGen:
                 self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
 
                 # add the raw values.
-                self.comment("\t\t\t\tAdd unboxed integers.")
+                self.comment("Add unboxed integers.")
                 self.add_asm(ASM_Add(temp_reg,acc_reg,temp_reg))
 
                 # save result
-                self.comment("\t\t\t\tPush result of adding on the stack.")
+                self.comment("Push result of adding on the stack.")
                 self.add_asm(ASM_Push(temp_reg))
                 # now in acc.
-                self.comment("\t\t\t\tCreate new Int Object.")
+                self.comment("Create new Int Object.")
                 self.cgen(New(Type="Int", StaticType="Int"))
-                self.comment("\t\t\t\tPop previously saved addition result off of stack.")
+                self.comment("Pop previously saved addition result off of stack.")
                 self.add_asm(ASM_Pop(temp_reg))
 
                 # store unboxed int in the new int
                 # stores value in src to dest[offset]
-                self.comment("\t\t\t\tStore unboxed int int new Int Object.")
+                self.comment("Store unboxed int int new Int Object.")
                 self.add_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
@@ -496,10 +512,10 @@ class CoolAsmGen:
                     # print("Unhandled Internal: ",Body)
                     pass
             case _:
-                # print("Unknown expression in cgen: ", exp)
+                print("Unknown expression in cgen: ", exp)
                 pass
 
-        self.comment(f"\t\t\t\tcgen-: {type(exp).__name__}")
+        # self.comment(f"cgen-: {type(exp).__name__}")
 
 
     def gen_dispatch_helper(self, Exp, Method, Args):
@@ -514,18 +530,17 @@ class CoolAsmGen:
         arg n....
         receiver object
         """
-        self.comment("\t\t\t\tPush arguments on the stack.")
+        self.comment("Push arguments on the stack.")
         for arg in Args:
             self.cgen(arg[1]) # skip line number
             self.add_asm(ASM_Push(acc_reg))
 
-        self.comment("\t\t\t\tPush receiver on the stack.")
+        self.comment("Push receiver on the stack.")
         if Exp:
             self.cgen(Exp)
             self.add_asm(ASM_Push(acc_reg))
         else:
             # object on which current method is invoked.
-            self.comment("should this be main? for main.out_int")
             self.add_asm(ASM_Mov(acc_reg,self_reg))
             self.add_asm(ASM_Push(self_reg))
 
@@ -538,7 +553,7 @@ class CoolAsmGen:
         # receiver object in acc.
         # e.g: someone wants to invoke "out_int" or "main"
         # emit code to lookup in vtable.
-        self.comment("\t\t\t\tLoading v table.")
+        self.comment("Loading v table.")
         self.add_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
 
         class_name = Exp.Type if Exp else self.current_class
@@ -546,16 +561,16 @@ class CoolAsmGen:
         # This should always access - unless we have a problem.
         method_vtable_index = self.vtable_method_indexes[(class_name, method_name)]
         # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
-        self.comment(f"\t\t\t\t{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
+        self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
         self.add_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
-        self.comment(f"\t\t\t\tIndirectly call the method.")
+        self.comment(f"Indirectly call the method.")
         self.add_asm(ASM_Call_Reg(temp_reg))
 
         # get back old frame pointer
         self.add_asm(ASM_Pop("fp"))
 
-    def comment(self,comment):
-        self.asm_instructions.append(ASM_Comment(comment=comment))
+    def comment(self,comment,not_tabbed=False):
+        self.asm_instructions.append(ASM_Comment(comment=comment,not_tabbed=not_tabbed))
 
     # call when entering new expression
     def push_scope(self):

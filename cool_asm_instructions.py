@@ -3,7 +3,7 @@ from collections import namedtuple
 
 
 # https://kelloggm.github.io/martinjkellogg.com/teaching/cs485-sp25/crm/modern/Cool%20Assembly%20Language.html
-ASM_Comment = namedtuple("ASM_Comment", "comment")
+ASM_Comment = namedtuple("ASM_Comment", "comment not_tabbed",defaults=[False])
 ASM_Label = namedtuple("ASM_Label", "label")
 
 ASM_Li = namedtuple("ASM_Li", "reg imm") # li r1 <- 123
