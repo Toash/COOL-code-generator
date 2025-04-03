@@ -14,9 +14,9 @@ rbp - base pointer
 rsp - stack pointer
 """
 class X86Gen:
-    def __init__(self, file):
-        outfile_name = "my_output.s"
-        cool_asm_gen = CoolAsmGen(file=file,x86=True)
+    def __init__(self, cl_type):
+        outfile_name = "file.s"
+        cool_asm_gen = CoolAsmGen(file=cl_type,x86=True)
 
         try:
             self.outfile = open(outfile_name,"w")
