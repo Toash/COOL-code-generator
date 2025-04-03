@@ -304,7 +304,9 @@ class CoolAsmGen:
             exp = imp[-1][1]
             self.add_asm(ASM_Label(f"{cname}.{mname}"))
 
+            # ---------------------- PROLOGUE ---------------------
             # set up base pointer address.
+            # self.add_asm(ASM_Push("fp"))
             self.add_asm(ASM_Mov("fp","sp"))
 
             # caller has pushed: arg1, arg2, arg3 receiver_object
@@ -315,6 +317,9 @@ class CoolAsmGen:
             self.add_asm(ASM_Ld(self_reg,"sp",1))
             # self.comment("\t\t\t\tPush return address (call instruction automatically stores it in ra.)")
             self.add_asm(ASM_Push("ra"))
+
+            # -------------------- END OF PROLOGUE-----------------------------
+
 
             # when we call Point.setX(newX : Integer)
             # there are a few variables in scope
@@ -350,23 +355,23 @@ class CoolAsmGen:
             # call method body.
             self.cgen(exp)
 
-            # ra gets top of stack
-            self.add_asm(ASM_Ld("ra","sp",1))
+            # ------------ EPILOGUE -----------------
+
+
+            # just pop ra!
+            self.add_asm(ASM_Pop("ra"))
+
             # arg1 .. n
             # receiver_object
-            # return address
-            z=num_args+2
+            z=num_args+1
             self.add_asm(ASM_Li(temp_reg,z))
 
-            # add sp <- sp z
-            self.comment("deallocating stack frame (this also removes the ra that was pushed earlier).")
-
+            # # add sp <- sp z
+            # self.comment("deallocating stack frame")
             self.add_asm(ASM_Add("sp","sp",temp_reg))
-
+            # self.add_asm(ASM_Mov(dest="sp",src="fp"))
+            # self.add_asm(ASM_Pop("fp"))
             self.pop_scope()
-
-
-
             self.add_asm(ASM_Return())
 
 
@@ -504,9 +509,10 @@ class CoolAsmGen:
                 if Body == "IO.out_int":
                     # in the case of out_int, x should be an integer.
                     self.cgen(Identifier(Var="x", StaticType=None))
-                    # load unboxed int
+
+                    self.comment("Load unboxed int.")
                     self.add_asm(ASM_Ld(acc_reg, acc_reg, attr_start_index))
-                    self.add_asm(ASM_Comment("out_int writes the raw integer in r1 to standard output."))
+
                     self.add_asm(ASM_Syscall(Body))
                 else:
                     # print("Unhandled Internal: ",Body)
@@ -521,6 +527,7 @@ class CoolAsmGen:
     def gen_dispatch_helper(self, Exp, Method, Args):
         vtable_index = 0
         self.add_asm(ASM_Push("fp"))
+        # self.add_asm(ASM_Push(self_reg))
         # args has line numbers and we need to skip them.
 
         """
@@ -566,6 +573,7 @@ class CoolAsmGen:
         self.comment(f"Indirectly call the method.")
         self.add_asm(ASM_Call_Reg(temp_reg))
 
+        # self.add_asm(ASM_Pop(self_reg))
         # get back old frame pointer
         self.add_asm(ASM_Pop("fp"))
 

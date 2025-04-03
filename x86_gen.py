@@ -25,6 +25,9 @@ class X86Gen:
         for instr in cool_asm:
             match instr:
                 case ASM_Label(label):
+                    if label == "start":
+                        label = "main"
+                    self.outfile.write(f".globl {label}\n")
                     self.outfile.write(f"{label}:\n")
                 case ASM_Li(reg,imm):
                     self.tab()
@@ -37,10 +40,10 @@ class X86Gen:
                     self.outfile.write(f"addq {self.get_reg(left)}, {self.get_reg(right)}\n")
                 case ASM_Call_Label(label):
                     self.tab()
-                    self.outfile.write(f"call ${label}\n")
+                    self.outfile.write(f"call {label}\n")
                 case ASM_Call_Reg(reg):
                     self.tab()
-                    self.outfile.write(f"call *{self.get_reg(reg)}")
+                    self.outfile.write(f"call *{self.get_reg(reg)}\n")
                 case ASM_Return():
                     self.tab()
                     # we need to handle returns differently.
@@ -103,6 +106,21 @@ class X86Gen:
                             self.outfile.write("movl $0, %edi\n")
                             self.tab()
                             self.outfile.write("call exit\n")
+                        case "IO.out_int":
+                            self.tab()
+                            self.outfile.write("movq $percent.d, %rdi\n")
+                            
+                            self.tab()
+                            self.outfile.write("movl %eax, %eax ## truncate higher 32 bits\n")
+                            self.tab()
+                            self.outfile.write("cdqe\t## sign extend the 32 bit integer\n")
+                            
+                            self.tab()
+                            self.outfile.write("movq %rax, %rsi\n")
+                            self.tab()
+                            self.outfile.write("movl $0, %eax\t## required by printf.\n")
+                            self.tab()
+                            self.outfile.write("call printf\n")
                         case _:
                             self.tab()
                             self.outfile.write(f"TODO: implement system call for \"{name}\".\n")
