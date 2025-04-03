@@ -31,13 +31,14 @@ class X86Gen:
                     self.outfile.write(f"{label}:\n")
                 case ASM_Li(reg,imm):
                     self.tab()
-                    self.outfile.write(f"movq ${imm}, {self.get_reg(reg)}\n")
+                    # FIXME : declare literal value or word value.
+                    self.outfile.write(f"movq ${int(imm)*8}, {self.get_reg(reg)}\n")
                 case ASM_Mov(dest,src):
                     self.tab()
                     self.outfile.write(f"movq {self.get_reg(src)}, {self.get_reg(dest)}\n")
                 case ASM_Add(dst,left,right):
                     self.tab()
-                    self.outfile.write(f"addq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.outfile.write(f"addq {self.get_reg(right)}, {self.get_reg(left)}\n")
                 case ASM_Call_Label(label):
                     self.tab()
                     self.outfile.write(f"call {label}\n")
