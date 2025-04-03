@@ -172,7 +172,7 @@ class CoolAsmGen:
             self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
             self.add_asm(ASM_Push("fp"))
             self.add_asm(ASM_Mov(dest="fp",src="sp"))
-            self.add_asm(ASM_Ld(self_reg,"sp",3))
+            self.add_asm(ASM_Ld(self_reg,"sp",2))
 
     def emit_function_epilogue(self,z):
         self.comment("FUNCTION CLEANUP")
@@ -368,6 +368,7 @@ class CoolAsmGen:
         self.comment("\n\n-=-=-=-=-=-=-=-=-  PROGRAM STARTS HERE  -=-=-=-=-=-=-=-=-",not_tabbed=True)
         self.add_asm(ASM_Label("start"))
         self.add_asm(ASM_Call_Label("Main..new"))
+        self.add_asm(ASM_Comment("Push receiver (in accumulator, from Main..new) on stack."))
         self.add_asm(ASM_Push(acc_reg))
         self.add_asm(ASM_Call_Label("Main.main"))
         self.add_asm(ASM_Syscall("exit"))
@@ -527,6 +528,7 @@ class CoolAsmGen:
             self.cgen(Exp)
         else:
             # object on which current method is invoked.
+            self.comment("Move receiver to accumulator.")
             self.add_asm(ASM_Mov(acc_reg,self_reg))
 
         self.comment("Push receiver on the stack.")

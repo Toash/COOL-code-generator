@@ -5,13 +5,18 @@ from pprint import pprint
 
 
 # given cl-type, parses cl-type, converts to cool-asm, then to x86.
-# register mappings:
-
+"""
+REGISTERS:
+r12 - self
+r13 - accumulator
+r14 - temp
+rbp - base pointer 
+rsp - stack pointer
+"""
 class X86Gen:
     def __init__(self, file):
         outfile_name = "my_output.s"
         cool_asm_gen = CoolAsmGen(file=file,x86=True)
-        # pprint(cool_asm_gen.get_asm())
 
         try:
             self.outfile = open(outfile_name,"w")
@@ -20,7 +25,6 @@ class X86Gen:
             self.c_placeholders()
             self.outfile.close()
 
-    # I guess we dont need named tuples for x86?
     def cool_asm_to_x86(self,cool_asm):
         for instr in cool_asm:
             match instr:
@@ -86,6 +90,12 @@ class X86Gen:
                     # self.outfile.write(f"movq {self.get_reg(src)}, %rdi");
                     # self.outfile.write("\t ## first argument - number of entries to allocate\n")
 
+                    self.outfile.write("\n")
+                    self.tab()
+                    self.outfile.write(f"--- CALLOC ---\n")
+                    self.tab()
+                    self.outfile.write(f"movq %r12, %rdi")
+                    self.outfile.write("\t ## first argument - amount of entries\n")
                     self.tab()
                     self.outfile.write(f"movq ${8}, %rsi")
                     self.outfile.write("\t ## second argument - size of each entry\n")
@@ -96,7 +106,7 @@ class X86Gen:
                     self.tab()
                     
                     self.outfile.write(f"movq %rax, {self.get_reg(dest)}\n")
-                    pass
+                    self.outfile.write("\n")
 
 
                 case ASM_Syscall(name):
@@ -145,14 +155,11 @@ class X86Gen:
     def get_reg(self,reg):
         # TODO: register spillover ( more than 6 arguments)
         return {
-           "r0":"%rdi",
-            "r1":"%rax",
-            "r2":"%r10",
-            "r3":"%r11",
+           "r0":"%r12",
+            "r1":"%r13",
+            "r2":"%r14",
             "fp":"%rbp",
             "sp":"%rsp",
-            "ra":"CHANGE - just use call / ret"
-
         }[reg]
 
 
