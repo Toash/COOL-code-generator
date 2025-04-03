@@ -400,13 +400,15 @@ class CoolAsmGen:
 
                 match self.lookup_symbol(Var):
                     case Register(reg):
-                        # print(f"Found variable in register {reg}")
                         self.comment(f"Found variable in register {reg}")
                         self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
                     case Offset(reg,offset):
-                        # print(f"Found variable in register {reg} at offset {offset}")
                         self.comment(f"Found variable in register {reg} at offset {offset}")
-                        self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
+                        if not self.x86:
+                            self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
+                        else:
+                            self.comment(f"x86: have to add one to offset (so offset is {offset+1}), because rbp is pushed.")
+                            self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset+1))
                     case _:
                         print(f"Could not find identifier {Var}")
                         self.add_asm(ASM_Mov(dest=acc_reg, src="NOT_FOUND" ))
