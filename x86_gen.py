@@ -10,7 +10,7 @@ from pprint import pprint
 class X86Gen:
     def __init__(self, file):
         outfile_name = "my_output.s"
-        cool_asm_gen = CoolAsmGen(file)
+        cool_asm_gen = CoolAsmGen(file=file,x86=True)
         # pprint(cool_asm_gen.get_asm())
 
         try:

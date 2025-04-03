@@ -39,43 +39,40 @@ so after function ends (and stack is the same before call, pop ra then return.)
 """
 class CoolAsmGen:
     """
-    x86 generates output that does not work for cool_asm, but is for x86 convention.
+    file - cl-type file name for Parser
+    outfile - file stream for cl-asm, for flushing cl-asm. should be provided if flushing.
+    x86 - generates output that does not work for cool_asm, but is for x86 convention.
     """
-    def __init__(self,file,x86=False):
-        try:
-            self.file = file
-            self.asm_instructions = []
+    def __init__(self, file, x86=False):
+        self.x86=x86
+        self.asm_instructions = [] # cool assembly emitted here.
 
-            # maps variable to member locations.
-            # variable could live in register
-            # or offset ( fp[4] )
-            self.symbol_stack = [{}]
+        # maps variable to member locations.
+        # variable could live in register
+        # or offset ( fp[4] )
+        self.symbol_stack = [{}]
 
-            # store index with <type, mname>
-            # to lookup when emitting code for dispatch
-            self.vtable_method_indexes = {}
+        # store index with <type, mname>
+        # to lookup when emitting code for dispatch
+        self.vtable_method_indexes = {}
 
-            # keep track of current_class for self_dispatch.
-            # because we need the type to call the constructor.
-            self.current_class = None
+        # keep track of current_class for self_dispatch.
+        # because we need the type to call the constructor.
+        self.current_class = None
 
-            asm_file = self.file.replace(".cl-type",".cl-asm")
-            self.outfile = open(asm_file,"w")
 
-            parser = AnnotatedAstReader(file)
-            self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
+        # parse .cl-type, get information
+        parser = AnnotatedAstReader(file)
+        self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
 
-            # attributes
-            self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
+        # Internal attributes 
+        self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
 
-            self.emit_vtables()
-            self.emit_constructors()
-            self.emit_methods()
+        self.emit_vtables()
+        self.emit_constructors()
+        self.emit_methods()
 
-            self.flush_asm()
 
-        finally:
-            self.outfile.close()
 
     def get_asm(self,include_comments = True):
         asm_instructions_no_comments = []
@@ -95,16 +92,16 @@ class CoolAsmGen:
         self.asm_instructions.append(instr)
 
 
-    def flush_asm(self):
+    def flush_asm(self,outfile):
         for instr in self.asm_instructions:
-            self.outfile.write(self.format_asm(instr) + "\n")
+            outfile.write(self.format_asm(instr,outfile) + "\n")
 
-    def format_asm(self,instr):
+    def format_asm(self,instr,outfile):
         tabs="\t\t"
 
 
         if type(instr).__name__ != "ASM_Label" and type(instr).__name__ != "ASM_Comment":
-            self.outfile.write(tabs)
+            outfile.write(tabs)
 
         match instr:
             case ASM_Comment(comment,not_tabbed):
@@ -163,40 +160,42 @@ class CoolAsmGen:
 
     def emit_function_prologue(self):
         # the cool way
-        self.comment("FUNCTION START")
-        self.add_asm(ASM_Mov("fp","sp"))
-        self.comment("Presumably, caller has pushed arguments,then receiver object on stack.")
-        self.comment("Load receiver object into r0 (receiver object is on top of stack).")
-        self.add_asm(ASM_Ld(self_reg,"sp",1))
-        self.add_asm(ASM_Push("ra"))
-
-        # the x86 way
-        # self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
-        # self.add_asm(ASM_Push("fp"))
-        # self.add_asm(ASM_Mov(dest="fp",src="sp"))
-        # self.add_asm(ASM_Push("ra"))
-        # self.add_asm(ASM_Ld(self_reg,"sp",3))
+        if not self.x86:
+            self.comment("FUNCTION START")
+            self.add_asm(ASM_Mov("fp","sp"))
+            self.comment("Presumably, caller has pushed arguments,then receiver object on stack.")
+            self.comment("Load receiver object into r0 (receiver object is on top of stack).")
+            self.add_asm(ASM_Ld(self_reg,"sp",1))
+            self.add_asm(ASM_Push("ra"))
+        else:
+            # the x86 way
+            self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
+            self.add_asm(ASM_Push("fp"))
+            self.add_asm(ASM_Mov(dest="fp",src="sp"))
+            self.add_asm(ASM_Ld(self_reg,"sp",3))
 
     def emit_function_epilogue(self,z):
         self.comment("FUNCTION CLEANUP")
-
-        # the cool way
-
-        # stack layout- 
-        #   arg1 .. n
-        #   receiver_object
-        #   return address
-        self.add_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
-        self.add_asm(ASM_Li(temp_reg,z))
-        self.add_asm(ASM_Add("sp","sp",temp_reg))
-        self.pop_scope()
-        self.add_asm(ASM_Return())
-
-        # the x86 way
-        # self.add_asm(ASM_Pop("ra"))
-        # self.add_asm(ASM_Mov(dest="sp", src="fp"))
-        # self.add_asm(ASM_Pop("fp"))
-        # self.add_asm(ASM_Return())
+        if not self.x86:
+            # the cool way
+            # stack layout- 
+            #   arg1 .. n
+            #   receiver_object
+            #   return address
+            self.add_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
+            self.add_asm(ASM_Li(temp_reg,z))
+            self.add_asm(ASM_Add("sp","sp",temp_reg))
+            self.pop_scope()
+            self.add_asm(ASM_Return())
+        else:
+            # the x86 way
+            # stack layout-
+            #   return address
+            #   arg1 .. n
+            #   receiver_object
+            self.add_asm(ASM_Mov(dest="sp", src="fp"))
+            self.add_asm(ASM_Pop("fp"))
+            self.add_asm(ASM_Return())
 
     # Loop through classes in imp map for their methods
     def emit_vtables(self):
@@ -555,6 +554,9 @@ class CoolAsmGen:
         self.comment(f"Indirectly call the method.")
         self.add_asm(ASM_Call_Reg(temp_reg))
 
+        # add to stack pointer to remove stuff?
+
+
         # self.add_asm(ASM_Pop(self_reg))
         # get back old frame pointer
         self.add_asm(ASM_Pop("fp"))
@@ -580,4 +582,9 @@ class CoolAsmGen:
         # sys.exit(1)
 
 if __name__ == "__main__":
-    coolAsmGen = CoolAsmGen(sys.argv[1])
+    file = sys.argv[1]
+    # open .cl-asm file to write.
+    asm_file = file.replace(".cl-type",".cl-asm")
+    with open(asm_file,"w") as outfile:
+        coolAsmGen = CoolAsmGen(file=file)
+        coolAsmGen.flush_asm(outfile)
