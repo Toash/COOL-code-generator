@@ -118,7 +118,7 @@ class CoolAsmGen:
             case ASM_Label(label):
                 return label + ":"
             case ASM_Li(reg, imm):
-                return f"li {reg} <- {imm}"
+                return f"li {reg} <- {imm.value}"
             case ASM_Mov(dest, src):
                 return f"mov {dest} <- {src}"
             case ASM_Add(dst, left, right):
@@ -183,7 +183,7 @@ class CoolAsmGen:
             #   receiver_object
             #   return address
             self.add_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
-            self.add_asm(ASM_Li(temp_reg,z))
+            self.add_asm(ASM_Li(temp_reg,ASM_Word(z)))
             self.add_asm(ASM_Add("sp","sp",temp_reg))
             self.pop_scope()
             self.add_asm(ASM_Return())
@@ -262,7 +262,7 @@ class CoolAsmGen:
             size = len(attrs) + 1
 
             self.comment(f"allocating {size} words of memory for object layout for class {cls}.")
-            self.add_asm(ASM_Li(reg = self_reg, imm = size))
+            self.add_asm(ASM_Li(reg = self_reg, imm = ASM_Value(size)))
             self.add_asm(ASM_Alloc(dest = self_reg, src = self_reg))
 
             vtable_index = 0
@@ -279,7 +279,7 @@ class CoolAsmGen:
                 # we need to store the raw int value in an attribute.
                 if attr.Type == "Unboxed_Int":
                     self.comment(f"Store raw int {0} for attribute in Int.")
-                    self.add_asm(ASM_Li(acc_reg,0))
+                    self.add_asm(ASM_Li(acc_reg,ASM_Value(0)))
                 else:
                     self.cgen(New(Type=attr.Type))
                 # store attribute in allocated self object.
@@ -415,7 +415,7 @@ class CoolAsmGen:
                 # access secrete fields :)
                 # this depends on the fact that the location of the raw int is the first attribute index.
                 self.comment(f"put {val} in the first attribute for a Cool Int Object :)")
-                self.add_asm(ASM_Li(temp_reg,val))
+                self.add_asm(ASM_Li(temp_reg,ASM_Value(val)))
                 self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
                 # Integer object now in accumulator register.
 
@@ -556,8 +556,15 @@ class CoolAsmGen:
         self.comment(f"Indirectly call the method.")
         self.add_asm(ASM_Call_Reg(temp_reg))
 
-        # add to stack pointer to remove stuff?
 
+        # in cool_asm we are adding to stack pointer in callee
+        # cant do this in x86, the return address is in the way.
+        # so we do it in the caller, where the return address has already been popped off by ret.
+        if self.x86:
+            self.comment(f"x86- clean up stack.")
+            self.add_asm(ASM_Li(acc_reg,ASM_Word(len(Args)+1)))
+            self.add_asm(ASM_Add("sp","sp",acc_reg))
+            pass
 
         # self.add_asm(ASM_Pop(self_reg))
         # get back old frame pointer

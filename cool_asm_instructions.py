@@ -1,6 +1,9 @@
 from collections import namedtuple
 
-
+# the actual value
+ASM_Value = namedtuple("ASM_Value","value")
+# used instead of ASM_Value when converting from cool 1 word size to arbitrary size (8 in x86)
+ASM_Word = namedtuple("ASM_Word","value")
 
 # https://kelloggm.github.io/martinjkellogg.com/teaching/cs485-sp25/crm/modern/Cool%20Assembly%20Language.html
 ASM_Comment = namedtuple("ASM_Comment", "comment not_tabbed",defaults=[False])

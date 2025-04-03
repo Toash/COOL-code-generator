@@ -35,8 +35,12 @@ class X86Gen:
                     self.outfile.write(f"{label}:\n")
                 case ASM_Li(reg,imm):
                     self.tab()
-                    # FIXME : declare literal value or word value.
-                    self.outfile.write(f"movq ${int(imm)*8}, {self.get_reg(reg)}\n")
+                    if isinstance(imm,ASM_Value):
+                        self.outfile.write(f"movq ${imm.value}, {self.get_reg(reg)}\n")
+                    elif isinstance(imm, ASM_Word):
+                        self.outfile.write(f"movq ${int(imm.value) * 8}, {self.get_reg(reg)}\n")
+                    else:
+                        raise Exception("Immediate should be ASM_Value or ASM_Word")
                 case ASM_Mov(dest,src):
                     self.tab()
                     self.outfile.write(f"movq {self.get_reg(src)}, {self.get_reg(dest)}\n")

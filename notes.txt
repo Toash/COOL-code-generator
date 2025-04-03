@@ -14,6 +14,9 @@ x86 handles returning differently-
             when callee is finished, the last statement should pop the return address from stack and jump to it.
             (stack should be preserved!)
 
+        caller should maintain stack integrity
+            Add to rsp after finishing procedure (i.e remove args and receiver object that was pushed earlier)
+
 
 
 Transfer of control- 
