@@ -531,8 +531,9 @@ class CoolAsmGen:
             self.comment("Move receiver to accumulator.")
             self.add_asm(ASM_Mov(acc_reg,self_reg))
 
-        self.comment("Push receiver on the stack.")
+        self.comment("Push self receiver on the stack.")
         self.add_asm(ASM_Push(acc_reg))
+
 
         """
         1. load RO (acc) vtable into (temp)

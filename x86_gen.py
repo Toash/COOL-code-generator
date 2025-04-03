@@ -96,7 +96,7 @@ class X86Gen:
 
                     self.outfile.write("\n")
                     self.tab()
-                    self.outfile.write(f"--- CALLOC ---\n")
+                    self.outfile.write(f"## --- CALLOC ---\n")
                     self.tab()
                     self.outfile.write(f"movq %r12, %rdi")
                     self.outfile.write("\t ## first argument - amount of entries\n")
@@ -131,7 +131,8 @@ class X86Gen:
                             self.outfile.write("cdqe\t## sign extend the 32 bit integer\n")
                             
                             self.tab()
-                            self.outfile.write("movq %rax, %rsi\n")
+                            # accumulator should hold the value we want to print.
+                            self.outfile.write("movq %r13, %rsi\n")
                             self.tab()
                             self.outfile.write("movl $0, %eax\t## required by printf.\n")
                             self.tab()
