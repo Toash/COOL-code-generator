@@ -356,6 +356,8 @@ class CoolAsmGen:
                 self.comment(f"Add argument {arg} to symbol table, it lives in fp[{fp_offset}]")
                 self.insert_symbol(arg, Offset("fp", fp_offset))
 
+            # we need to actually load these args in .
+
             self.cgen(exp)
 
             # ------------ EPILOGUE -----------------
@@ -399,9 +401,11 @@ class CoolAsmGen:
                 match self.lookup_symbol(Var):
                     case Register(reg):
                         # print(f"Found variable in register {reg}")
+                        self.comment(f"Found variable in register {reg}")
                         self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
                     case Offset(reg,offset):
                         # print(f"Found variable in register {reg} at offset {offset}")
+                        self.comment(f"Found variable in register {reg} at offset {offset}")
                         self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                     case _:
                         print(f"Could not find identifier {Var}")
