@@ -126,6 +126,8 @@ class CoolAsmGen:
                 return f"add {right} <- {right} {left}"
             case ASM_Sub(left, right):
                 return f"sub {right} <- {right} {left}"
+            case ASM_Mul(left, right):
+                return f"mul {right} <- {right} {left}"
 
             case ASM_Call_Label(label):
                 return f"call {label}"
@@ -518,6 +520,37 @@ class CoolAsmGen:
 
                 # Subtraction result now in accumulator.
 
+            case Times(Left,Right):
+                self.cgen(Left[1])
+                self.add_asm(ASM_Push(acc_reg))
+                self.cgen(Right[1])
+                self.add_asm(ASM_Pop(temp_reg))
+
+                self.comment("Load unboxed integers.")
+                self.add_asm(ASM_Ld(
+                    dest = acc_reg,
+                    src = acc_reg,
+                    offset = attr_start_index))
+                self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+
+                self.comment("Multiply unboxed integers.")
+                self.add_asm(ASM_Mul(acc_reg,temp_reg))
+
+                self.comment("Push result of adding on the stack.")
+                self.add_asm(ASM_Push(temp_reg))
+
+                self.comment("Create new Int Object.")
+                self.cgen(New(Type="Int", StaticType="Int"))
+                self.comment("Pop previously saved multiplication result off of stack.")
+                self.add_asm(ASM_Pop(temp_reg))
+
+                self.comment("Store unboxed int inside new Int Object.")
+                self.add_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attr_start_index))
+
+                # Multiplication result now in accumulator.
 
             case New(Type):
 
