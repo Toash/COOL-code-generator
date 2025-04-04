@@ -413,7 +413,7 @@ class CoolAsmGen:
         # we need to change this when adding tags and size in the object layout.
         attr_start_index = 1
 
-        # self.comment(f"\t\t\t\tcgen+: {exp}")
+        self.comment(f"cgen+: {type(exp).__name__}")
 
         # locs = []
         # for var, loc in self.symbol_stack[-1].items():
@@ -426,36 +426,29 @@ class CoolAsmGen:
         # self.comment(f"\t\t\tsymbol_table in current scope: {locs}")
 
         match exp:
-            # look up in symbol table, if found, store in accumulator.
-            case Identifier(Var):
 
-                match self.lookup_symbol(Var):
-                    case Register(reg):
-                        self.comment(f"Found variable in register {reg}")
-                        self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
-                    case Offset(reg,offset):
-                        self.comment(f"Found variable in register {reg} at offset {offset}")
-                        if not self.x86:
-                            self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
-                        else:
-                            self.comment(f"x86: have to add one to offset (so offset is {offset+1}), because rbp is pushed.")
-                            self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset+1))
-                    case _:
-                        print(f"Could not find identifier {Var}")
-                        self.add_asm(ASM_Mov(dest=acc_reg, src="NOT_FOUND" ))
+            # Dispatch
+            case Dynamic_Dispatch(Exp,Method,Args):
+                self.gen_dispatch_helper(Exp=Exp, Method=Method, Args=Args)
+            case Self_Dispatch(Method,Args):
+                self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
 
-            case Integer(Integer=val, StaticType=st):
-                # make new int , (default initialized with 0)
-                self.comment("We are making an int, so we need an Int object.")
-                self.cgen(New(Type="Int",StaticType="Int"))
 
-                # access secrete fields :)
-                # this depends on the fact that the location of the raw int is the first attribute index.
-                self.comment(f"put {val} in the first attribute for a Cool Int Object :)")
-                self.add_asm(ASM_Li(temp_reg,ASM_Value(val)))
-                self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
-                # Integer object now in accumulator register.
+            case Block(Body):
+                for exp in Body:
+                    exp = exp[1]
+                    self.cgen(exp)
+            # acc will contain the last result of the entire block.
 
+            case New(Type):
+                self.add_asm(ASM_Push("fp"))
+                self.add_asm(ASM_Push(self_reg))
+                # going to put result in ra register.
+                # constructor has no arguments and no self object.
+                self.add_asm(ASM_Call_Label(f"{Type}..new"))
+                self.add_asm(ASM_Pop(self_reg))
+                self.add_asm(ASM_Pop("fp"))
+                # New object now in accumulator.
 
             case Plus(Left,Right):
                 self.cgen(Left[1])
@@ -584,23 +577,37 @@ class CoolAsmGen:
                     offset = attr_start_index))
                 # Division result now in accumulator.
 
-            case New(Type):
 
-                self.add_asm(ASM_Push("fp"))
-                self.add_asm(ASM_Push(self_reg))
-                # going to put result in ra register.
-                # constructor has no arguments and no self object.
-                self.add_asm(ASM_Call_Label(f"{Type}..new"))
-                self.add_asm(ASM_Pop(self_reg))
-                self.add_asm(ASM_Pop("fp"))
 
-                # New object now in accumulator.
+            case Integer(Integer=val, StaticType=st):
+                # make new int , (default initialized with 0)
+                self.comment("We are making an int, so we need an Int object.")
+                self.cgen(New(Type="Int",StaticType="Int"))
 
-            # Dispatch
-            case Dynamic_Dispatch(Exp,Method,Args):
-                self.gen_dispatch_helper(Exp=Exp, Method=Method, Args=Args)
-            case Self_Dispatch(Method,Args):
-                self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
+                # access secrete fields :)
+                # this depends on the fact that the location of the raw int is the first attribute index.
+                self.comment(f"put {val} in the first attribute for a Cool Int Object :)")
+                self.add_asm(ASM_Li(temp_reg,ASM_Value(val)))
+                self.add_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
+                # Integer object now in accumulator register.
+
+            # look up in symbol table, if found, store in accumulator.
+            case Identifier(Var):
+                match self.lookup_symbol(Var):
+                    case Register(reg):
+                        self.comment(f"Found variable in register {reg}")
+                        self.add_asm(ASM_Mov(dest = acc_reg, src = reg))
+                    case Offset(reg,offset):
+                        self.comment(f"Found variable in register {reg} at offset {offset}")
+                        if not self.x86:
+                            self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
+                        else:
+                            self.comment(f"x86: have to add one to offset (so offset is {offset+1}), because rbp is pushed.")
+                            self.add_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset+1))
+                    case _:
+                        print(f"Could not find identifier {Var}")
+                        self.add_asm(ASM_Mov(dest=acc_reg, src="NOT_FOUND" ))
+
             case Internal(Body):
 
                 if Body == "IO.out_int":
@@ -618,7 +625,7 @@ class CoolAsmGen:
                 print("Unknown expression in cgen: ", exp)
                 pass
 
-        # self.comment(f"cgen-: {type(exp).__name__}")
+        self.comment(f"cgen-: {type(exp).__name__}")
 
 
     def gen_dispatch_helper(self, Exp, Method, Args):
