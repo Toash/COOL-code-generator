@@ -66,11 +66,19 @@ class CoolAsmGen:
 
         # Internal attributes 
         self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
+        # bool also holds a raw int like the Int object.
+        self.class_map["Bool"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
 
         self.emit_vtables()
         self.emit_constructors()
         self.emit_methods()
-        # emit_eq_handler(self.asm_instructions,x86)
+        emit_eq_handler(self.asm_instructions,x86)
+        emit_eq_false(self.asm_instructions,x86)
+        emit_eq_true(self.asm_instructions,x86)
+        emit_eq_bool(self.asm_instructions,x86)
+        emit_eq_int(self.asm_instructions,x86)
+        emit_eq_end(self.asm_instructions,x86)
+
         self.emit_start()
 
 
@@ -131,6 +139,8 @@ class CoolAsmGen:
             case ASM_Div(left, right):
                 return f"div {right} <- {right} {left}"
 
+            case ASM_Jmp(label):
+                return f"jmp {label}"
             case ASM_Beq(left,right,label):
                 return f"beq {left} {right} {label}"
 
@@ -324,7 +334,7 @@ class CoolAsmGen:
             # default initializers
             if attrs:
                 self.comment("Attributes - default allocation")
-            for attr_index,attr in enumerate(attrs, start=1):
+            for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
 
                 # we are in Int Class.
                 # we need to store the raw int value in an attribute.
@@ -332,15 +342,16 @@ class CoolAsmGen:
                     self.comment(f"Store raw int {0} for attribute in Int.")
                     self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
                 else:
+                    self.comment(f"Create new object for {attr.Type}")
                     self.cgen(New(Type=attr.Type))
                 # store attribute in allocated self object.
-                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attributes_start_index))
+                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
 
 
             # explicit initializers.
             if attrs:
-                self.comment("Initializers- overwriting attributes if defined.")
-            for attr_index,attr in enumerate(attrs, start=1):
+                self.comment("Initializers- overwriting attributes where initializers are defined.")
+            for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
                 if attr.Type == "Unboxed_Int":
                     continue # already initialized this to 0.
 
@@ -349,7 +360,7 @@ class CoolAsmGen:
                 self.cgen(exp)
                 # store the result of cgen in an attribute slot.
                 self.comment(f"Initialized {attr}")
-                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attributes_start_index))
+                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
 
 
             self.comment("As promised, store the new object into the accumulator.")
