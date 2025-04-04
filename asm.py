@@ -121,8 +121,8 @@ class CoolAsmGen:
                 return f"li {reg} <- {imm.value}"
             case ASM_Mov(dest, src):
                 return f"mov {dest} <- {src}"
-            case ASM_Add(dst, left, right):
-                return f"add {dst} <- {left} {right}"
+            case ASM_Add(left, right):
+                return f"add {right} <- {left} {right}"
 
             case ASM_Call_Label(label):
                 return f"call {label}"
@@ -181,7 +181,7 @@ class CoolAsmGen:
             # alignment padding
             self.comment("16 byte alignment padding")
             self.add_asm(ASM_Li(temp_reg,ASM_Word(1)))
-            self.add_asm(ASM_Sub("sp","sp",temp_reg))
+            self.add_asm(ASM_Sub(temp_reg,"sp"))
             
             
 
@@ -195,7 +195,7 @@ class CoolAsmGen:
             #   return address
             self.add_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
             self.add_asm(ASM_Li(temp_reg,ASM_Word(z)))
-            self.add_asm(ASM_Add("sp","sp",temp_reg))
+            self.add_asm(ASM_Add(temp_reg,"sp"))
             self.pop_scope()
             self.add_asm(ASM_Return())
         else:
@@ -276,7 +276,7 @@ class CoolAsmGen:
             if self.x86:
                 self.comment("stack offset for 16 byte alignment")
                 self.add_asm(ASM_Li(temp_reg,ASM_Word(1)))
-                self.add_asm(ASM_Sub("sp","sp",temp_reg))
+                self.add_asm(ASM_Sub(temp_reg,"sp"))
 
             # adding 1 for v table ptr.
             size = len(attrs) + 1
@@ -482,7 +482,7 @@ class CoolAsmGen:
                 self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
 
                 self.comment("Add unboxed integers.")
-                self.add_asm(ASM_Add(temp_reg,acc_reg,temp_reg))
+                self.add_asm(ASM_Add(acc_reg,temp_reg))
 
                 self.comment("Push result of adding on the stack.")
                 self.add_asm(ASM_Push(temp_reg))
@@ -499,6 +499,7 @@ class CoolAsmGen:
                     offset = attr_start_index))
 
                 # Addition result now in accumulator.
+                
 
 
             case New(Type):
@@ -597,7 +598,7 @@ class CoolAsmGen:
         if self.x86:
             self.comment(f"x86- clean up stack.")
             self.add_asm(ASM_Li(acc_reg,ASM_Word(len(Args)+1)))
-            self.add_asm(ASM_Add("sp","sp",acc_reg))
+            self.add_asm(ASM_Add(acc_reg,"sp"))
             pass
 
         # self.add_asm(ASM_Pop(self_reg))

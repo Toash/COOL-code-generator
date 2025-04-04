@@ -12,10 +12,10 @@ ASM_Label = namedtuple("ASM_Label", "label")
 ASM_Li = namedtuple("ASM_Li", "reg imm") # li r1 <- 123
 ASM_Mov = namedtuple("ASM_Mov", "dest src") # mov r1 <- r2
 
-ASM_Add = namedtuple("ASM_Add", "dst left right")
-ASM_Sub = namedtuple("ASM_Sub", "dst left right")
-ASM_Mul = namedtuple("ASM_Mul", "dst left right")
-ASM_Div = namedtuple("ASM_Div", "dst left right")
+ASM_Add = namedtuple("ASM_Add", "left right")
+ASM_Sub = namedtuple("ASM_Sub", "left right")
+ASM_Mul = namedtuple("ASM_Mul", "left right")
+ASM_Div = namedtuple("ASM_Div", "left right")
 
 ASM_Jmp = namedtuple("ASM_Jmp", "label")
 ASM_Bz = namedtuple("ASM_Bz", "reg label")
