@@ -17,8 +17,6 @@ x86 handles returning differently-
         caller should maintain stack integrity
             Add to rsp after finishing procedure (i.e remove args and receiver object that was pushed earlier)
 
-
-
 Transfer of control- 
     Jumps   
     Returns
@@ -56,3 +54,6 @@ Register usage
     called function returns with:
         movq %rbp, %rsp
         popq %rbp
+
+
+Type tags used to determine types when doing equality comparisons.

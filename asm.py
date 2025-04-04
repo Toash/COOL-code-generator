@@ -4,6 +4,7 @@ from asm_registers import *
 from ast_nodes import *
 from asm_instructions import *
 from asm_helpers import *
+from asm_constants import *
 import sys
 from pprint import pprint
 
@@ -69,7 +70,7 @@ class CoolAsmGen:
         self.emit_vtables()
         self.emit_constructors()
         self.emit_methods()
-        emit_eq_handler(self.asm_instructions,x86)
+        # emit_eq_handler(self.asm_instructions,x86)
         self.emit_start()
 
 
@@ -129,6 +130,9 @@ class CoolAsmGen:
                 return f"mul {right} <- {right} {left}"
             case ASM_Div(left, right):
                 return f"div {right} <- {right} {left}"
+
+            case ASM_Beq(left,right,label):
+                return f"beq {left} {right} {label}"
 
             case ASM_Call_Label(label):
                 return f"call {label}"
@@ -240,7 +244,6 @@ class CoolAsmGen:
                     if cls == class_name:
                         # body contaisn a string for the actual class and method called.
                         self.append_asm(ASM_Constant_label(label=f"{exp.Body}"))
-                        # self.vtable_method_indexes[(class_name, exp.Body)] = index
                         self.vtable_method_indexes[(class_name, (exp.Body).split(".")[1] )] = index
                         index += 1
                 else:
@@ -286,17 +289,37 @@ class CoolAsmGen:
                 self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
                 self.append_asm(ASM_Sub(temp_reg,"sp"))
 
+            # adding 1 for type tag.
+            # adding 1 for size.
             # adding 1 for v table ptr.
-            size = len(attrs) + 1
+            # indexes are in asm_constants.py
+            size = len(attrs) + 3
 
             self.comment(f"allocating {size} words of memory for object layout for class {cls}.")
             self.append_asm(ASM_Li(reg = self_reg, imm = ASM_Value(size)))
             self.append_asm(ASM_Alloc(dest = self_reg, src = self_reg))
 
-            vtable_index = 0
+            match(cls):
+                case "Bool":
+                    tag=Bool_tag
+                case "Int":
+                    tag=Int_tag
+                case _:
+                    # FIXME: handle arbitrary amount of type tags.
+                    tag=1000
+
+            self.comment(f"Store type tag ({tag} for {cls}) at index {type_tag_index}")
+            self.append_asm(ASM_Li(temp_reg,ASM_Value(tag))) 
+            self.append_asm(ASM_St(self_reg, temp_reg, type_tag_index))
+
+            # TODO: implement object size
+            self.comment(f"Store object size at index {object_size_index}")
+            self.append_asm(ASM_Li(temp_reg,ASM_Value(3 + len(attrs))))
+            self.append_asm(ASM_St(self_reg, temp_reg, object_size_index))
+
             self.comment(f"Store vtable pointer at index {vtable_index}")
             self.append_asm(ASM_La(temp_reg, f"{cls}..vtable"))
-            self.append_asm(ASM_St(self_reg, temp_reg, 0))
+            self.append_asm(ASM_St(self_reg, temp_reg, vtable_index))
 
             # default initializers
             if attrs:
@@ -311,7 +334,7 @@ class CoolAsmGen:
                 else:
                     self.cgen(New(Type=attr.Type))
                 # store attribute in allocated self object.
-                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
+                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attributes_start_index))
 
 
             # explicit initializers.
@@ -326,7 +349,7 @@ class CoolAsmGen:
                 self.cgen(exp)
                 # store the result of cgen in an attribute slot.
                 self.comment(f"Initialized {attr}")
-                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attr_index))
+                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = attributes_start_index))
 
 
             self.comment("As promised, store the new object into the accumulator.")
@@ -371,6 +394,7 @@ class CoolAsmGen:
             for index,attr in enumerate(self.class_map[cname],start=1):
                 if index==1:
                     self.comment("Setting up addresses for attributes (based off offsets from self reg)")
+                # FIXME - X86
                 self.comment(f"Setting up attribute, it lives in {self_reg}[{stack_cleanup_size}]")
                 self.insert_symbol(attr.Name , Offset(self_reg, index))
 
@@ -394,6 +418,7 @@ class CoolAsmGen:
 
             # ------------ EPILOGUE -----------------
 
+            # args + self and return ?
             stack_cleanup_size=num_args+2
             self.emit_function_epilogue(stack_cleanup_size)
 
@@ -416,8 +441,6 @@ class CoolAsmGen:
     """
     def cgen(self, exp)->None:
 
-        # we need to change this when adding tags and size in the object layout.
-        attr_start_index = 1
 
         self.comment(f"cgen+: {type(exp).__name__}")
 
@@ -440,9 +463,9 @@ class CoolAsmGen:
                 self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
 
             case If(Predicate, Then, Else):
-                print("If predicate:", Predicate)
-                print("If then:", Then)
-                print("If else:", Else)
+                # print("If predicate:", Predicate)
+                # print("If then:", Then)
+                # print("If else:", Else)
 
                 # predicate
 
@@ -482,8 +505,8 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
-                    offset = attr_start_index))
-                self.append_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+                    offset = attributes_start_index))
+                self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.comment("Add unboxed integers.")
                 self.append_asm(ASM_Add(acc_reg,temp_reg))
@@ -500,7 +523,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
-                    offset = attr_start_index))
+                    offset = attributes_start_index))
 
                 # Addition result now in accumulator.
                 
@@ -514,8 +537,8 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
-                    offset = attr_start_index))
-                self.append_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+                    offset = attributes_start_index))
+                self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.comment("Subtract unboxed integers.")
                 self.append_asm(ASM_Sub(acc_reg,temp_reg))
@@ -533,7 +556,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
-                    offset = attr_start_index))
+                    offset = attributes_start_index))
 
                 # Subtraction result now in accumulator.
 
@@ -547,8 +570,8 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
-                    offset = attr_start_index))
-                self.append_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+                    offset = attributes_start_index))
+                self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.comment("Multiply unboxed integers.")
                 self.append_asm(ASM_Mul(acc_reg,temp_reg))
@@ -565,7 +588,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
-                    offset = attr_start_index))
+                    offset = attributes_start_index))
                 # Multiplication result now in accumulator.
 
             case Divide(Left,Right):
@@ -578,8 +601,8 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
-                    offset = attr_start_index))
-                self.append_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+                    offset = attributes_start_index))
+                self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.comment("Divide unboxed integers.")
                 self.append_asm(ASM_Div(acc_reg,temp_reg))
@@ -596,7 +619,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
-                    offset = attr_start_index))
+                    offset = attributes_start_index))
                 # Division result now in accumulator.
 
 
@@ -610,7 +633,7 @@ class CoolAsmGen:
                 # this depends on the fact that the location of the raw int is the first attribute index.
                 self.comment(f"put {val} in the first attribute for a Cool Int Object :)")
                 self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
-                self.append_asm(ASM_St(acc_reg,temp_reg,attr_start_index))
+                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
                 # Integer object now in accumulator register.
 
             # look up in symbol table, if found, store in accumulator.
@@ -637,7 +660,7 @@ class CoolAsmGen:
                     self.cgen(Identifier(Var="x", StaticType=None))
 
                     self.comment("Load unboxed int.")
-                    self.append_asm(ASM_Ld(acc_reg, acc_reg, attr_start_index))
+                    self.append_asm(ASM_Ld(acc_reg, acc_reg, attributes_start_index))
 
                     self.append_asm(ASM_Syscall(Body))
                 else:
@@ -651,7 +674,6 @@ class CoolAsmGen:
 
 
     def gen_dispatch_helper(self, Exp, Method, Args):
-        vtable_index = 0
 
         #save self object and frame pointer to restore later
         self.append_asm(ASM_Push(self_reg))

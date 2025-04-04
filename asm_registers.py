@@ -9,4 +9,4 @@ ra is for cool return shenanigans
 self_reg = "r0"
 acc_reg = "r1"  # result of expressions are always in accumulator
 temp_reg = "r2"
-
+temp2_reg = "r3"
