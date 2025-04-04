@@ -44,9 +44,14 @@ class X86Gen:
                 case ASM_Mov(dest,src):
                     self.tab()
                     self.outfile.write(f"movq {self.get_reg(src)}, {self.get_reg(dest)}\n")
+
                 case ASM_Add(dst,left,right):
                     self.tab()
                     self.outfile.write(f"addq {self.get_reg(right)}, {self.get_reg(left)}\n")
+                case ASM_Sub(dst,left,right):
+                    self.tab()
+                    self.outfile.write(f"subq {self.get_reg(right)}, {self.get_reg(left)}\n")
+
                 case ASM_Call_Label(label):
                     self.tab()
                     self.outfile.write(f"call {label}\n")

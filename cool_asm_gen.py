@@ -172,7 +172,18 @@ class CoolAsmGen:
             self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
             self.add_asm(ASM_Push("fp"))
             self.add_asm(ASM_Mov(dest="fp",src="sp"))
+            # load stack pointer
+            # +1 for return address
+            # +1 for the actual self object
             self.add_asm(ASM_Ld(self_reg,"sp",2))
+
+
+            # alignment padding
+            self.comment("16 byte alignment padding")
+            self.add_asm(ASM_Li(temp_reg,ASM_Word(1)))
+            self.add_asm(ASM_Sub("sp","sp",temp_reg))
+            
+            
 
     def emit_function_epilogue(self,z):
         self.comment("FUNCTION CLEANUP")
@@ -196,6 +207,8 @@ class CoolAsmGen:
             self.add_asm(ASM_Mov(dest="sp", src="fp"))
             self.add_asm(ASM_Pop("fp"))
             self.add_asm(ASM_Return())
+
+
 
     # Loop through classes in imp map for their methods
     def emit_vtables(self):
@@ -254,9 +267,16 @@ class CoolAsmGen:
             ....
             """
             self.comment("setup stuff")
+            if self.x86:
+                self.add_asm(ASM_Push("fp")) # we will set stack pointer to this later
             self.add_asm(ASM_Mov("fp","sp"))
             self.add_asm(ASM_Push("ra"))
-            
+           
+
+            if self.x86:
+                self.comment("stack offset for 16 byte alignment")
+                self.add_asm(ASM_Li(temp_reg,ASM_Word(1)))
+                self.add_asm(ASM_Sub("sp","sp",temp_reg))
 
             # adding 1 for v table ptr.
             size = len(attrs) + 1
@@ -306,6 +326,9 @@ class CoolAsmGen:
 
 
             self.comment("cleanup stuff")
+            if self.x86:
+                self.add_asm(ASM_Mov("sp","fp"))
+                self.add_asm(ASM_Pop("fp"))
             self.add_asm(ASM_Pop("ra"))
             self.add_asm(ASM_Return())
 
@@ -369,6 +392,7 @@ class CoolAsmGen:
         # the special start method.
         self.comment("\n\n-=-=-=-=-=-=-=-=-  PROGRAM STARTS HERE  -=-=-=-=-=-=-=-=-",not_tabbed=True)
         self.add_asm(ASM_Label("start"))
+        # push frame pointer for ret in Main..new
         self.add_asm(ASM_Call_Label("Main..new"))
         self.add_asm(ASM_Comment("Push receiver (in accumulator, from Main..new) on stack."))
         self.add_asm(ASM_Push(acc_reg))
