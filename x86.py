@@ -1,4 +1,4 @@
-from cool_asm_gen import CoolAsmGen
+from asm import CoolAsmGen
 from cool_asm_instructions import *
 import sys
 from pprint import pprint

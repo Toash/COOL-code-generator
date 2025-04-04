@@ -74,7 +74,7 @@ class CoolAsmGen:
 
 
 
-    def get_asm(self,include_comments = True):
+    def get_asm(self,include_comments = False):
         asm_instructions_no_comments = []
 
         # lol
@@ -540,6 +540,7 @@ class CoolAsmGen:
 
     def gen_dispatch_helper(self, Exp, Method, Args):
         vtable_index = 0
+        self.add_asm(ASM_Push(self_reg))
         self.add_asm(ASM_Push("fp"))
 
         """
@@ -600,6 +601,7 @@ class CoolAsmGen:
         # self.add_asm(ASM_Pop(self_reg))
         # get back old frame pointer
         self.add_asm(ASM_Pop("fp"))
+        self.add_asm(ASM_Pop(self_reg))
 
     def comment(self,comment,not_tabbed=False):
         self.asm_instructions.append(ASM_Comment(comment=comment,not_tabbed=not_tabbed))
