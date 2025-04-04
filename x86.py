@@ -53,7 +53,19 @@ class X86Gen:
                     self.outfile.write(f"subq {self.get_reg(left)}, {self.get_reg(right)}\n")
                 case ASM_Mul(left,right):
                     self.tab()
-                    self.outfile.write(f"imul {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.outfile.write(f"imulq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                case ASM_Div(left,right):
+                    self.tab()
+                    self.outfile.write(f"movq {self.get_reg(right)}, %rax\n")
+                    self.tab()
+                    self.outfile.write(f"movq {self.get_reg(left)}, %rbx\n")
+                    self.tab()
+                    # sign extend RAX into RDX:RAX (RDX will be all 1s or 0s)
+                    self.outfile.write("cqto\n") 
+                    self.tab()
+                    self.outfile.write(f"idivq %rbx\n")
+                    self.tab()
+                    self.outfile.write(f"movq %rax, {self.get_reg(right)}\n")
 
                 case ASM_Call_Label(label):
                     self.tab()

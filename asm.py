@@ -121,13 +121,15 @@ class CoolAsmGen:
                 return f"li {reg} <- {imm.value}"
             case ASM_Mov(dest, src):
                 return f"mov {dest} <- {src}"
-
+            
             case ASM_Add(left, right):
                 return f"add {right} <- {right} {left}"
             case ASM_Sub(left, right):
                 return f"sub {right} <- {right} {left}"
             case ASM_Mul(left, right):
                 return f"mul {right} <- {right} {left}"
+            case ASM_Div(left, right):
+                return f"div {right} <- {right} {left}"
 
             case ASM_Call_Label(label):
                 return f"call {label}"
@@ -504,7 +506,7 @@ class CoolAsmGen:
                 self.add_asm(ASM_Sub(acc_reg,temp_reg))
 
 
-                self.comment("Push result of adding on the stack.")
+                self.comment("Push result of subtracting on the stack.")
                 self.add_asm(ASM_Push(temp_reg))
 
                 self.comment("Create new Int Object.")
@@ -536,7 +538,7 @@ class CoolAsmGen:
                 self.comment("Multiply unboxed integers.")
                 self.add_asm(ASM_Mul(acc_reg,temp_reg))
 
-                self.comment("Push result of adding on the stack.")
+                self.comment("Push result of multiplying on the stack.")
                 self.add_asm(ASM_Push(temp_reg))
 
                 self.comment("Create new Int Object.")
@@ -549,8 +551,38 @@ class CoolAsmGen:
                     dest = acc_reg,
                     src = temp_reg,
                     offset = attr_start_index))
-
                 # Multiplication result now in accumulator.
+
+            case Divide(Left,Right):
+                self.cgen(Left[1])
+                self.add_asm(ASM_Push(acc_reg))
+                self.cgen(Right[1])
+                self.add_asm(ASM_Pop(temp_reg))
+
+                self.comment("Load unboxed integers.")
+                self.add_asm(ASM_Ld(
+                    dest = acc_reg,
+                    src = acc_reg,
+                    offset = attr_start_index))
+                self.add_asm(ASM_Ld(temp_reg,temp_reg,attr_start_index))
+
+                self.comment("Divide unboxed integers.")
+                self.add_asm(ASM_Div(acc_reg,temp_reg))
+
+                self.comment("Push result of dividing on the stack.")
+                self.add_asm(ASM_Push(temp_reg))
+
+                self.comment("Create new Int Object.")
+                self.cgen(New(Type="Int", StaticType="Int"))
+                self.comment("Pop previously saved division result off of stack.")
+                self.add_asm(ASM_Pop(temp_reg))
+
+                self.comment("Store unboxed int inside new Int Object.")
+                self.add_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attr_start_index))
+                # Division result now in accumulator.
 
             case New(Type):
 
