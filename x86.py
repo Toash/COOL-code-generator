@@ -1,5 +1,5 @@
 from asm import CoolAsmGen
-from cool_asm_instructions import *
+from asm_instructions import *
 import sys
 from pprint import pprint
 
