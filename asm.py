@@ -540,6 +540,8 @@ class CoolAsmGen:
 
     def gen_dispatch_helper(self, Exp, Method, Args):
         vtable_index = 0
+
+        #save self object and frame pointer to restore later
         self.add_asm(ASM_Push(self_reg))
         self.add_asm(ASM_Push("fp"))
 
