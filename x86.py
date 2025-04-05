@@ -85,6 +85,11 @@ class X86Gen:
                     self.outfile.write(f"cmpq {self.get_reg(right)}, {self.get_reg(left)}\n")
                     self.tab()
                     self.outfile.write(f"jl {label}\n")
+                case ASM_Ble(left,right,label):
+                    self.tab()
+                    self.outfile.write(f"cmpq {self.get_reg(right)}, {self.get_reg(left)}\n")
+                    self.tab()
+                    self.outfile.write(f"jle {label}\n")
 
 
                 case ASM_Call_Label(label):
