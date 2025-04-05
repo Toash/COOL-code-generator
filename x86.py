@@ -23,6 +23,8 @@ class X86Gen:
             self.cool_asm_to_x86(cool_asm_gen.get_asm())
         finally:
             self.c_placeholders()
+            # mark stack as non executabale
+            self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
             self.outfile.close()
 
     def cool_asm_to_x86(self,cool_asm):
