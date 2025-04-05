@@ -2,12 +2,22 @@ from asm_instructions import *
 from asm_registers import *
 from asm_constants import *
 
-def emit_eq_handler(asm_instructions : list, x86:bool) -> None:
+
+"""
+type can be 
+eq, lt ,le
+"""
+def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
+
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_handler"))
+        asm_instructions.append(ASM_Comment("helper function for ="))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_handler"))
+        asm_instructions.append(ASM_Comment("helper function for <"))
+    
     if x86:
         asm_instructions.append(ASM_Push("fp"))
-
-    asm_instructions.append(ASM_Label("eq_handler"))
-    asm_instructions.append(ASM_Comment("helper function for ="))
     asm_instructions.append(ASM_Mov("fp","sp"))
     
     # get self
@@ -16,19 +26,28 @@ def emit_eq_handler(asm_instructions : list, x86:bool) -> None:
     if not x86:
         asm_instructions.append(ASM_Push("ra")) 
 
-    # comparing objects.
-    # first argument 
-    asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
-    # second argument
-    asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+    # arguments
+    if not x86:
+        asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
+        asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+    else:
+        # one more for the frame pointer pushed on the stack.
+        asm_instructions.append(ASM_Ld(acc_reg,"fp",4))
+        asm_instructions.append(ASM_Ld(temp_reg,"fp",3))
 
-    # if they are equal, true!
-    asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_true"))
+    if type == "eq":
+        # if they are equal, true!
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_true"))
 
     # check if either operand is null. 
-    asm_instructions.append(ASM_Li(temp2_reg,ASM_Word(0)))
-    asm_instructions.append(ASM_Beq(acc_reg,temp2_reg,"eq_false"))
-    asm_instructions.append(ASM_Beq(temp2_reg,temp2_reg,"eq_false"))
+    asm_instructions.append(ASM_Li(temp2_reg,ASM_Value(0)))
+    if type == "eq":
+        asm_instructions.append(ASM_Beq(acc_reg,temp2_reg,"eq_false"))
+        asm_instructions.append(ASM_Beq(temp_reg,temp2_reg,"eq_false"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Beq(acc_reg,temp2_reg,"lt_false"))
+        asm_instructions.append(ASM_Beq(temp_reg,temp2_reg,"lt_false"))
+
     
     # do some shenanigans with type tags to check for types of operands.
     asm_instructions.append(ASM_Ld(acc_reg,acc_reg,type_tag_index))
@@ -39,38 +58,62 @@ def emit_eq_handler(asm_instructions : list, x86:bool) -> None:
 
     # check for bool and bool
     asm_instructions.append(ASM_Comment("Both operands are Bools"))
-    asm_instructions.append(ASM_Li(acc_reg,ASM_Word(Bool_tag + Bool_tag))) 
-    asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_bool"))
+    asm_instructions.append(ASM_Li(temp_reg,ASM_Value(Bool_tag + Bool_tag))) 
+    if type == "eq":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_bool"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"lt_bool"))
+
     # check for int and int
     asm_instructions.append(ASM_Comment("Both operands are Ints"))
-    asm_instructions.append(ASM_Li(acc_reg,ASM_Word(Int_tag+Int_tag))) 
-    asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_int"))
+    asm_instructions.append(ASM_Li(temp_reg,ASM_Value(Int_tag+Int_tag))) 
+    if type == "eq":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_int"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"lt_int"))
 
     # TODO: do same for string
 
-    asm_instructions.append(ASM_Comment("otherwise, use pointer comparison"))
-    # first argument 
-    asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
-    # second argument
-    asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
-    asm_instructions.append(ASM_Beq(acc_reg,temp_reg, "eq_true"))
+    if type == "eq":
+        asm_instructions.append(ASM_Comment("otherwise, use pointer comparison"))
+        if not x86:
+            asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
+            asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+        else:
+            asm_instructions.append(ASM_Ld(acc_reg,"fp",4))
+            asm_instructions.append(ASM_Ld(temp_reg,"fp",3))
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg, "eq_true"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Comment("for non-primitives, < is always false."))
 
 # IMPORTANT- this should be emitted under eq handler for correct fall through.
-def emit_eq_false(asm_instructions : list, x86:bool) -> None:
-    asm_instructions.append(ASM_Label("eq_false"))
-    asm_instructions.append(ASM_Comment("not equal"))
+def emit_comparison_false(type:str,asm_instructions : list, x86:bool) -> None:
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_false"))
+        asm_instructions.append(ASM_Comment("not equal"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_false"))
+        asm_instructions.append(ASM_Comment("not less than"))
     asm_instructions.append(ASM_Push("fp"))
     asm_instructions.append(ASM_Push(self_reg))
     asm_instructions.append(ASM_Call_Label("Bool..new"))
     # Bools store 0 by default.
     asm_instructions.append(ASM_Pop(self_reg))
     asm_instructions.append(ASM_Pop("fp"))
-    asm_instructions.append(ASM_Jmp("eq_end"))
+
+    if type=="eq":
+        asm_instructions.append(ASM_Jmp("eq_end"))
+    elif type=="lt":
+        asm_instructions.append(ASM_Jmp("lt_end"))
 
 
-def emit_eq_true(asm_instructions : list, x86:bool) -> None:
-    asm_instructions.append(ASM_Label("eq_true"))
-    asm_instructions.append(ASM_Comment("equal"))
+def emit_comparison_true(type:str,asm_instructions : list, x86:bool) -> None:
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_true"))
+        asm_instructions.append(ASM_Comment("equal"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_true"))
+        asm_instructions.append(ASM_Comment("less than"))
     asm_instructions.append(ASM_Push("fp"))
     asm_instructions.append(ASM_Push(self_reg))
     asm_instructions.append(ASM_Call_Label("Bool..new"))
@@ -81,36 +124,54 @@ def emit_eq_true(asm_instructions : list, x86:bool) -> None:
     asm_instructions.append(ASM_Comment("store 1 in attribute, because its true!"))
     asm_instructions.append(ASM_Li(temp_reg,ASM_Value(1)))
     asm_instructions.append(ASM_St(acc_reg,temp_reg,attributes_start_index))
-    asm_instructions.append(ASM_Jmp("eq_end"))
-
+    if type == "eq":
+        asm_instructions.append(ASM_Jmp("eq_end"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Jmp("lt_end"))
 
 
 # IMPORTANT - this should fall through to eq_int.
-def emit_eq_bool(asm_instructions : list, x86:bool) -> None:
-    asm_instructions.append(ASM_Label("eq_bool"))
+def emit_comparison_bool(type:str,asm_instructions : list, x86:bool) -> None:
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_bool"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_bool"))
     asm_instructions.append(ASM_Comment("two bools"))
-def emit_eq_int(asm_instructions : list, x86:bool) -> None:
-    asm_instructions.append(ASM_Label("eq_int"))
+
+def emit_comparison_int(type:str,asm_instructions : list, x86:bool) -> None:
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_int"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_int"))
     asm_instructions.append(ASM_Comment("two ints"))
 
-    # both objects
-    asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
-    asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+    # args
+    if not x86:
+        asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
+        asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+    else:
+        asm_instructions.append(ASM_Ld(acc_reg,"fp",4))
+        asm_instructions.append(ASM_Ld(temp_reg,"fp",3))
 
     asm_instructions.append(ASM_Comment("Extract raw values."))
     asm_instructions.append(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
     asm_instructions.append(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
-    asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_true"))
-    asm_instructions.append(ASM_Jmp("eq_false"))
-
-
-    
+    if type == "eq":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_true"))
+        asm_instructions.append(ASM_Jmp("eq_false"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Blt(acc_reg,temp_reg,"lt_true"))
+        asm_instructions.append(ASM_Jmp("lt_false"))
 
 # IMPORTANT - tihs must be emitted
-def emit_eq_end(asm_instructions : list, x86:bool) -> None:
+def emit_comparison_end(type:str,asm_instructions : list, x86:bool) -> None:
 
-    asm_instructions.append(ASM_Label("eq_end"))
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_end"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_end"))
+
     # x86 handles cleanup in caller
     # cool does so in callee.
     if not x86:

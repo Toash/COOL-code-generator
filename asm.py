@@ -72,12 +72,24 @@ class CoolAsmGen:
         self.emit_vtables()
         self.emit_constructors()
         self.emit_methods()
-        emit_eq_handler(self.asm_instructions,x86)
-        emit_eq_false(self.asm_instructions,x86)
-        emit_eq_true(self.asm_instructions,x86)
-        emit_eq_bool(self.asm_instructions,x86)
-        emit_eq_int(self.asm_instructions,x86)
-        emit_eq_end(self.asm_instructions,x86)
+        self.cond_then_label = ""
+        self.cond_else_label = ""
+        self.cond_end_label = ""
+
+        emit_comparison_handler("eq", self.asm_instructions,x86)
+        emit_comparison_false("eq", self.asm_instructions,x86)
+        emit_comparison_true("eq", self.asm_instructions,x86)
+        emit_comparison_bool("eq", self.asm_instructions,x86)
+        emit_comparison_int("eq", self.asm_instructions,x86)
+        emit_comparison_end("eq", self.asm_instructions,x86)
+
+        emit_comparison_handler("lt", self.asm_instructions,x86)
+        emit_comparison_false("lt", self.asm_instructions,x86)
+        emit_comparison_true("lt", self.asm_instructions,x86)
+        emit_comparison_bool("lt", self.asm_instructions,x86)
+        emit_comparison_int("lt", self.asm_instructions,x86)
+        emit_comparison_end("lt", self.asm_instructions,x86)
+
 
         self.emit_start()
 
@@ -145,6 +157,9 @@ class CoolAsmGen:
                 return f"bnz {reg} {label}"
             case ASM_Beq(left,right,label):
                 return f"beq {left} {right} {label}"
+            # https://en.wikipedia.org/wiki/BLT
+            case ASM_Blt(left,right,label):
+                return f"blt {left} {right} {label}"
 
             case ASM_Call_Label(label):
                 return f"call {label}"
@@ -479,41 +494,35 @@ class CoolAsmGen:
                 self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
 
             case If(Predicate, Then, Else):
-                then_label = "true_" + self.get_branch_label()
-                else_label = "false_" + self.get_branch_label()
-                end_label = "end_" + self.get_branch_label()
+                self.cond_then_label = "true_" + self.get_branch_label()
+                self.cond_else_label = "false_" + self.get_branch_label()
+                self.cond_end_label = "end_" + self.get_branch_label()
 
                 # predicate
                 match Predicate[1]:
+                    case Lt(Left,Right):
+                        self.cgen(Lt(Left,Right,StaticType="Bool"))                        
                     case true(Value):
-                        self.cgen(New(Type="Bool", StaticType="Bool"))
-                        self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
-                        self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
-                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                        self.append_asm(ASM_Bnz(acc_reg,then_label))
-                        
+                        self.cgen(true(Value,StaticType="Bool"))
                     case false(Value):
-                        self.cgen(New(Type="Bool", StaticType="Bool"))
-                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                        self.append_asm(ASM_Bnz(acc_reg,then_label))
-
+                        self.cgen(false(Value,StaticType="Bool"))
                     case _:
                        print("Unhandled predicate:", Predicate) 
 
                 # else
                 self.comment("ELSE (False branch)",not_tabbed=True)
-                self.append_asm(ASM_Label(else_label))
+                self.append_asm(ASM_Label(self.cond_else_label))
                 self.cgen(Else[1])
-                self.append_asm(ASM_Jmp(end_label))
+                self.append_asm(ASM_Jmp(self.cond_end_label))
 
                 # then
                 self.comment("THEN (True branch)",not_tabbed=True)
-                self.append_asm(ASM_Label(then_label))
+                self.append_asm(ASM_Label(self.cond_then_label))
                 self.cgen(Then[1])
 
                 # end
                 self.comment("END of if conditional")
-                self.append_asm(ASM_Label(end_label))
+                self.append_asm(ASM_Label(self.cond_end_label))
 
                 # Accumulater will contain the result of either the then or else.
 
@@ -662,10 +671,51 @@ class CoolAsmGen:
                 # Division result now in accumulator.
 
 
+            case Lt(Left,Right):
+                self.append_asm(ASM_Push(self_reg))
+                self.append_asm(ASM_Push("fp"))
+
+                left_type =  Left[1].StaticType
+                self.cgen(New(Type= left_type,StaticType=left_type))
+                # load the actual values
+                if(isinstance(Left[1],Integer)):
+                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Left[1].Integer)))    
+                    self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                else:
+                    raise Exception("unhandled operands in bool comparison")
+                self.append_asm(ASM_Push(acc_reg))
+
+                right_type =  Right[1].StaticType
+                self.cgen(New(Type=right_type, StaticType=right_type))
+                # load the actual values
+                if(isinstance(Right[1],Integer)):
+                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Right[1].Integer)))    
+                    self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                else:
+                    raise Exception("unhandled operands in bool comparison")
+                self.append_asm(ASM_Push(acc_reg))
+                self.append_asm(ASM_Push(self_reg))
+                # stack:
+                # left
+                # right
+                # self object
+                self.append_asm(ASM_Call_Label("lt_handler"))
+                if self.x86:
+                    self.comment("x86- deallocate two args and self.")
+                    self.append_asm(ASM_Li(temp_reg,ASM_Word(3)))
+                    self.append_asm(ASM_Add(temp_reg,"sp"))
+                # CLEANUP
+                self.append_asm(ASM_Pop("fp"))
+                self.append_asm(ASM_Pop(self_reg))
+
+                # less than handler gave us something
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,3))
+                self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
+
+
 
             case Integer(Integer=val, StaticType=st):
                 # make new int , (default initialized with 0)
-                self.comment("We are making an int, so we need an Int object.")
                 self.cgen(New(Type="Int",StaticType="Int"))
 
                 # access secrete fields :)
@@ -691,6 +741,18 @@ class CoolAsmGen:
                     case _:
                         print(f"Could not find identifier {Var}")
                         self.append_asm(ASM_Mov(dest=acc_reg, src="NOT_FOUND" ))
+
+            case true(Value):
+                self.cgen(New(Type="Bool", StaticType="Bool"))
+                self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
+                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
+                
+            case false(Value):
+                self.cgen(New(Type="Bool", StaticType="Bool"))
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
 
             case Internal(Body):
 
