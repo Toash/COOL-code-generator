@@ -67,6 +67,20 @@ class X86Gen:
                     self.tab()
                     self.outfile.write(f"movq %rax, {self.get_reg(right)}\n")
 
+                case ASM_Jmp(label):
+                    self.tab()
+                    self.outfile.write(f"jmp {label}\n")
+                case ASM_Bnz(reg, label):
+                    self.tab()
+                    self.outfile.write(f"cmpq $0, {self.get_reg(reg)}\n")
+                    self.tab()
+                    self.outfile.write(f"jne {label}\n")
+                case ASM_Beq(left, right, label):
+                    self.tab()
+                    self.outfile.write(f"cmpq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.tab()
+                    self.outfile.write(f"je {label}\n")
+
                 case ASM_Call_Label(label):
                     self.tab()
                     self.outfile.write(f"call {label}\n")

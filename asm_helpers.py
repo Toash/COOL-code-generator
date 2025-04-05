@@ -110,6 +110,7 @@ def emit_eq_int(asm_instructions : list, x86:bool) -> None:
 # IMPORTANT - tihs must be emitted
 def emit_eq_end(asm_instructions : list, x86:bool) -> None:
 
+    asm_instructions.append(ASM_Label("eq_end"))
     # x86 handles cleanup in caller
     # cool does so in callee.
     if not x86:
@@ -125,7 +126,8 @@ def emit_eq_end(asm_instructions : list, x86:bool) -> None:
 
 
     if x86:
-        asm_instructions.append(ASM_Pop("fp"))
+        asm_instructions.append(ASM_Mov("sp","fp"))
+        asm_instructions.append(ASM_Pop("fp")) # get back old base pointer
     asm_instructions.append(ASM_Return())
     
 
