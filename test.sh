@@ -7,6 +7,9 @@ echo
 cool ./tests/arith.cl
 echo
 
+echo
+
+
 echo "Bool (no let) test..."
 cool --type ./tests/bool_no_let.cl
 python3 main.py ./tests/bool_no_let.cl-type
@@ -14,6 +17,8 @@ gcc -no-pie -static file.s
 ./a.out
 echo
 cool ./tests/bool_no_let.cl
+echo
+
 echo
 
 echo "Let (no init) test..."

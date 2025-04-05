@@ -49,6 +49,9 @@ class CoolAsmGen:
         # variable could live in register
         # or offset ( fp[4] )
         self.symbol_stack = [{}]
+        # when going to into method - check for   
+        self.temporaries_needed= 0
+        self.temporary_index = 0
 
         # store index with <type, mname>
         # to lookup when emitting code for dispatch
@@ -115,13 +118,17 @@ class CoolAsmGen:
         else:
             return self.asm_instructions
 
+    def flush_asm(self,outfile,include_comments = False) -> None:
+        if include_comments:
+            for instr in self.asm_instructions:
+                outfile.write(self.format_asm(instr,outfile) + "\n")
+        else:
+            for instr in self.asm_instructions:
+                if not isinstance(instr,ASM_Comment):
+                    outfile.write(self.format_asm(instr,outfile) + "\n")
+
     def append_asm(self,instr: namedtuple) -> None:
         self.asm_instructions.append(instr)
-
-
-    def flush_asm(self,outfile) -> None:
-        for instr in self.asm_instructions:
-            outfile.write(self.format_asm(instr,outfile) + "\n")
 
     def format_asm(self,instr:namedtuple,outfile) -> str:
         tabs="\t\t"
@@ -203,56 +210,6 @@ class CoolAsmGen:
                 print("Unhandled ASM instruction: ", instr)
                 sys.exit(1)
 
-
-    def emit_function_prologue(self) -> None:
-        # the cool way
-        if not self.x86:
-            self.comment("FUNCTION START")
-            self.append_asm(ASM_Mov("fp","sp"))
-            self.comment("Presumably, caller has pushed arguments,then receiver object on stack.")
-            self.comment("Load receiver object into r0 (receiver object is on top of stack).")
-            self.append_asm(ASM_Ld(self_reg,"sp",1))
-            self.append_asm(ASM_Push("ra"))
-        else:
-            # the x86 way
-            self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
-            self.append_asm(ASM_Push("fp"))
-            self.append_asm(ASM_Mov(dest="fp",src="sp"))
-            # load stack pointer
-            # +1 for return address
-            # +1 for the actual self object
-            self.append_asm(ASM_Ld(self_reg,"sp",2))
-
-
-            # alignment padding
-            self.comment("16 byte alignment padding")
-            self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
-            self.append_asm(ASM_Sub(temp_reg,"sp"))
-            
-            
-
-    def emit_function_epilogue(self,z) -> None:
-        self.comment("FUNCTION CLEANUP")
-        if not self.x86:
-            # the cool way
-            # stack layout- 
-            #   arg1 .. n
-            #   receiver_object
-            #   return address
-            self.append_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
-            self.append_asm(ASM_Li(temp_reg,ASM_Word(z)))
-            self.append_asm(ASM_Add(temp_reg,"sp"))
-            self.pop_scope()
-            self.append_asm(ASM_Return())
-        else:
-            # the x86 way
-            # stack layout-
-            #   return address
-            #   arg1 .. n
-            #   receiver_object
-            self.append_asm(ASM_Mov(dest="sp", src="fp"))
-            self.append_asm(ASM_Pop("fp"))
-            self.append_asm(ASM_Return())
 
 
 
@@ -401,6 +358,34 @@ class CoolAsmGen:
                 self.append_asm(ASM_Pop("ra"))
             self.append_asm(ASM_Return())
 
+    # recursively traverses expression and computes the temporaries 
+    #   needed to cgen the exp.
+    # for example, each let binding needs room on the stack.
+    # dont need to reserve room for function args, as they are pushed on the stack prior.
+    def compute_max_stack_depth(self, exp) -> int:
+        match exp:
+
+            case Block(Body):
+                return max(self.compute_max_stack_depth(e[1]) for e in Body)
+
+            case If(Predicate, Then, Else):
+                then_depth = self.compute_max_stack_depth(Then[1])
+                else_depth = self.compute_max_stack_depth(Else[1])
+                return max(then_depth, else_depth)
+
+            case Let(Bindings, Body):
+                total_let_depth = len(Bindings)
+                body_depth = self.compute_max_stack_depth(Body[1])
+                return max(total_let_depth, body_depth)
+
+            case Internal():
+                return 0
+
+            case Self_Dispatch () | Dynamic_Dispatch() | Static_Dispatch():
+                return 0
+            case _:
+                print("Unhandled in stack analysis:", exp)
+                return 0
 
     def emit_methods(self)->None:
         self.comment("METHODS",not_tabbed=True)
@@ -413,7 +398,7 @@ class CoolAsmGen:
 
             # ---------------------- PROLOGUE ---------------------
             
-            self.emit_function_prologue()
+            self.emit_function_prologue(exp)
 
             # -------------------- END OF PROLOGUE-----------------------------
 
@@ -440,10 +425,13 @@ class CoolAsmGen:
                 if index == 1:
                     self.comment("Getting args.")
 
+                # + 1 because of base pointer
+                # + 1 because of return address
                 # + 1 because of self object
+                # after all that, we actually get the arguments. (that were pushed by caller)
                 # leftmost arguments are closer to the frame pointer.
                 # the self object is right next to the frame pointer.
-                fp_offset=num_args+1-index + 1
+                fp_offset=num_args-index + 1 + 1 + 1 
 
                 # these formals live at at offset of the frame pointer.
                 self.comment(f"Add argument {arg} to symbol table, it lives in fp[{fp_offset}]")
@@ -452,17 +440,83 @@ class CoolAsmGen:
             # we need to actually load these args in .
 
             self.append_asm(ASM_Comment("start code-genning method body"))
+            # print(exp)
             self.cgen(exp)
             self.append_asm(ASM_Comment("done code-genning method body"))
 
             # ------------ EPILOGUE -----------------
 
-            # args 
-            # +1 for self ( we never actually pop r0 on method start
-            #                    unlike the reference compiler.)
-            # +1 for return  ( we dont pop it, we just read it from top.)
-            stack_cleanup_size=num_args+2
+            # args  (this only matters for cool)
+            stack_cleanup_size=num_args
             self.emit_function_epilogue(stack_cleanup_size)
+
+    def emit_function_prologue(self,exp) -> None:
+        # the cool way
+        if not self.x86:
+            self.comment("FUNCTION START")
+            self.append_asm(ASM_Mov("fp","sp"))
+            self.comment("Presumably, caller has pushed arguments,then receiver object on stack.")
+            self.comment("Load receiver object into r0 (receiver object is on top of stack).")
+            # self.append_asm(ASM_Ld(self_reg,"sp",1))
+            self.append_asm(ASM_Pop(self_reg))
+
+            # we use positive indicies to refer to variables pushed by the caller 
+            #   (functoin args, self object)
+
+            # we use negative indices to refer to temporaries in the current procedures.
+            #   ( let bindings , etc.)
+            
+            self.append_asm(ASM_Comment("Stack room for temporaries"))
+            self.temporaries_needed= self.compute_max_stack_depth(exp)
+
+            # i have no idea why this doesnt work without +1....
+            self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed+1))) 
+            self.append_asm(ASM_Sub(temp_reg,"sp")) 
+
+            self.append_asm(ASM_Push("ra"))
+
+
+        else:
+            # the x86 way
+            self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
+            self.append_asm(ASM_Push("fp"))
+            self.append_asm(ASM_Mov(dest="fp",src="sp"))
+            # +1 for pushed rbp
+            # +1 for return address ( exclusive to x86 :) )
+            # +1 for the actual self object that we are getting
+            self.append_asm(ASM_Ld(self_reg,"sp",2))
+
+
+            # alignment padding
+            self.comment("16 byte alignment padding")
+            self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
+            self.append_asm(ASM_Sub(temp_reg,"sp"))
+            
+            
+
+    def emit_function_epilogue(self,num_args) -> None:
+        self.comment("FUNCTION CLEANUP")
+        if not self.x86:
+            # the cool way
+            # stack layout- 
+            #   arg1 .. n
+            # self.append_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
+            self.append_asm(ASM_Pop("ra"))
+            self.append_asm(ASM_Li(temp_reg,ASM_Word(num_args+self.temporaries_needed+1)))
+            self.append_asm(ASM_Add(temp_reg,"sp"))
+            self.pop_scope()
+            self.append_asm(ASM_Return())
+        else:
+            # the x86 way
+            # stack layout-
+            #   arg1 .. n
+            #   self object 
+            #   return address
+            self.append_asm(ASM_Mov(dest="sp", src="fp"))
+            self.append_asm(ASM_Pop("fp"))
+            self.append_asm(ASM_Return())
+
+        self.temporary_index = 0
 
 
     def emit_start(self)->None:
@@ -733,8 +787,6 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,3))
                 self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
 
-
-
             case Integer(Integer=val, StaticType=st):
                 # make new int , (default initialized with 0)
                 self.cgen(New(Type="Int",StaticType="Int"))
@@ -748,7 +800,13 @@ class CoolAsmGen:
 
             # look up in symbol table, if found, store in accumulator.
             case Identifier(Var):
-                match self.lookup_symbol(Var):
+                if isinstance(Var,ID):
+                    var = Var.str
+                if isinstance(Var,Attribute):
+                    var = Var.Name
+                if isinstance(Var,str):
+                    var=Var
+                match self.lookup_symbol(var):
                     case Register(reg):
                         self.comment(f"Found variable in register {reg}")
                         self.append_asm(ASM_Mov(dest = acc_reg, src = reg))
@@ -757,11 +815,9 @@ class CoolAsmGen:
                         if not self.x86:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                         else:
-                            self.comment(f"x86: have to add one to offset (so offset is {offset+1}), because rbp is pushed.")
-                            self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset+1))
+                            self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                     case _:
-                        print(f"Could not find identifier {Var}")
-                        self.append_asm(ASM_Mov(dest=acc_reg, src="NOT_FOUND" ))
+                        raise Exception(f"Could not find identifier {var}!")
 
             case true(Value):
                 self.cgen(New(Type="Bool", StaticType="Bool"))
@@ -774,6 +830,33 @@ class CoolAsmGen:
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
+
+            case Let(Bindings,Body):
+                # pushing new scope so that we can store the positions for varibles.
+                # so that when we encounter a variable that we set in the bindings,
+                #   we can correctly refer to it.
+                self.push_scope()
+
+
+                self.comment("Code generating let bindings.")
+                for binding in Bindings:
+                    self.cgen(binding)
+
+                self.comment("Code generating let body.")
+                self.cgen(Body[1])
+
+                # when done, pop the symbol table off stack.
+                self.pop_scope()
+
+
+            # this should update the  
+            case Let_No_Init(Var,Type):
+                # add the variable to the symbol table.
+                var = Var[1]
+                self.cgen(New(Type=Type.str,StaticType=Type.str))
+                self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
+                self.insert_symbol(var,Offset("fp",self.temporary_index))
+                self.temporary_index-=1
 
             case Internal(Body):
 
@@ -867,14 +950,18 @@ class CoolAsmGen:
 
     # call when entering new expression
     def push_scope(self):
+        self.comment(f"Entering new scope for symbol table.")
         self.symbol_stack.append({})
+
     def pop_scope(self):
+        self.comment(f"Leaving current scope for symbol table.")
         self.symbol_stack.pop()
 
-    def insert_symbol(self, symbol, loc):
+    def insert_symbol(self, symbol:str, loc:Register | Offset):
+        self.comment(f"adding {symbol} to symbol table with value {loc}")
         self.symbol_stack[-1][symbol] = loc
 
-    def lookup_symbol(self, symbol):
+    def lookup_symbol(self, symbol:str):
         for scope in reversed(self.symbol_stack):
             if symbol in scope:
                 return scope[symbol]
