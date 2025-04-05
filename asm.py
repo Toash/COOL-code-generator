@@ -83,6 +83,13 @@ class CoolAsmGen:
         emit_comparison_int("eq", self.asm_instructions,x86)
         emit_comparison_end("eq", self.asm_instructions,x86)
 
+        emit_comparison_handler("le", self.asm_instructions,x86)
+        emit_comparison_false("le", self.asm_instructions,x86)
+        emit_comparison_true("le", self.asm_instructions,x86)
+        emit_comparison_bool("le", self.asm_instructions,x86)
+        emit_comparison_int("le", self.asm_instructions,x86)
+        emit_comparison_end("le", self.asm_instructions,x86)
+
         emit_comparison_handler("lt", self.asm_instructions,x86)
         emit_comparison_false("lt", self.asm_instructions,x86)
         emit_comparison_true("lt", self.asm_instructions,x86)
@@ -160,6 +167,8 @@ class CoolAsmGen:
             # https://en.wikipedia.org/wiki/BLT
             case ASM_Blt(left,right,label):
                 return f"blt {left} {right} {label}"
+            case ASM_Ble(left,right,label):
+                return f"ble {left} {right} {label}"
 
             case ASM_Call_Label(label):
                 return f"call {label}"
@@ -502,6 +511,10 @@ class CoolAsmGen:
                 match Predicate[1]:
                     case Lt(Left,Right):
                         self.cgen(Lt(Left,Right,StaticType="Bool"))                        
+                    case Le(Left,Right):
+                        self.cgen(Le(Left,Right,StaticType="Bool"))                        
+                    case Eq(Left,Right):
+                        self.cgen(Eq(Left,Right,StaticType="Bool"))                        
                     case true(Value):
                         self.cgen(true(Value,StaticType="Bool"))
                     case false(Value):
@@ -671,7 +684,7 @@ class CoolAsmGen:
                 # Division result now in accumulator.
 
 
-            case Lt(Left,Right):
+            case Lt(Left,Right) | Le(Left,Right) | Eq(Left, Right):
                 self.append_asm(ASM_Push(self_reg))
                 self.append_asm(ASM_Push("fp"))
 
@@ -699,7 +712,15 @@ class CoolAsmGen:
                 # left
                 # right
                 # self object
-                self.append_asm(ASM_Call_Label("lt_handler"))
+                match type(exp).__name__:
+                    case "Lt":
+                        self.append_asm(ASM_Call_Label("lt_handler"))
+                    case "Le":
+                        self.append_asm(ASM_Call_Label("le_handler"))
+                    case "Eq":
+                        self.append_asm(ASM_Call_Label("eq_handler"))
+                    case _:
+                        raise Exception("Unknown conditional expression:", exp) 
                 if self.x86:
                     self.comment("x86- deallocate two args and self.")
                     self.append_asm(ASM_Li(temp_reg,ASM_Word(3)))

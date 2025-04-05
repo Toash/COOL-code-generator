@@ -11,6 +11,11 @@ class Main inherits IO{
             else
                 out_int(1337)
             fi;
+            if 1<=1 then
+                out_int(420)
+            else
+                out_int(1337)
+            fi;
         }
     };
 };

@@ -15,6 +15,9 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "lt":
         asm_instructions.append(ASM_Label("lt_handler"))
         asm_instructions.append(ASM_Comment("helper function for <"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_handler"))
+        asm_instructions.append(ASM_Comment("helper function for <="))
     
     if x86:
         asm_instructions.append(ASM_Push("fp"))
@@ -38,6 +41,9 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
     if type == "eq":
         # if they are equal, true!
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_true"))
+    elif type == "le":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"le_true"))
+
 
     # check if either operand is null. 
     asm_instructions.append(ASM_Li(temp2_reg,ASM_Value(0)))
@@ -47,7 +53,9 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "lt":
         asm_instructions.append(ASM_Beq(acc_reg,temp2_reg,"lt_false"))
         asm_instructions.append(ASM_Beq(temp_reg,temp2_reg,"lt_false"))
-
+    elif type == "le":
+        asm_instructions.append(ASM_Beq(acc_reg,temp2_reg,"le_false"))
+        asm_instructions.append(ASM_Beq(temp_reg,temp2_reg,"le_false"))
     
     # do some shenanigans with type tags to check for types of operands.
     asm_instructions.append(ASM_Ld(acc_reg,acc_reg,type_tag_index))
@@ -63,6 +71,8 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_bool"))
     elif type == "lt":
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"lt_bool"))
+    elif type == "le":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"le_bool"))
 
     # check for int and int
     asm_instructions.append(ASM_Comment("Both operands are Ints"))
@@ -71,6 +81,8 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_int"))
     elif type == "lt":
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"lt_int"))
+    elif type == "le":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"le_int"))
 
     # TODO: do same for string
 
@@ -85,6 +97,16 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg, "eq_true"))
     elif type == "lt":
         asm_instructions.append(ASM_Comment("for non-primitives, < is always false."))
+        asm_instructions.append(ASM_Comment("so just fall through to false label"))
+    elif type == "le":
+        asm_instructions.append(ASM_Comment("just like eq, use pointer comparison"))
+        if not x86:
+            asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
+            asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+        else:
+            asm_instructions.append(ASM_Ld(acc_reg,"fp",4))
+            asm_instructions.append(ASM_Ld(temp_reg,"fp",3))
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg, "le_true"))
 
 # IMPORTANT- this should be emitted under eq handler for correct fall through.
 def emit_comparison_false(type:str,asm_instructions : list, x86:bool) -> None:
@@ -94,10 +116,13 @@ def emit_comparison_false(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "lt":
         asm_instructions.append(ASM_Label("lt_false"))
         asm_instructions.append(ASM_Comment("not less than"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_false"))
+        asm_instructions.append(ASM_Comment("not less than or equal"))
+    asm_instructions.append(ASM_Comment("Just create a bool with defualt initialization (0)"))
     asm_instructions.append(ASM_Push("fp"))
     asm_instructions.append(ASM_Push(self_reg))
     asm_instructions.append(ASM_Call_Label("Bool..new"))
-    # Bools store 0 by default.
     asm_instructions.append(ASM_Pop(self_reg))
     asm_instructions.append(ASM_Pop("fp"))
 
@@ -105,6 +130,8 @@ def emit_comparison_false(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Jmp("eq_end"))
     elif type=="lt":
         asm_instructions.append(ASM_Jmp("lt_end"))
+    elif type=="le":
+        asm_instructions.append(ASM_Jmp("le_end"))
 
 
 def emit_comparison_true(type:str,asm_instructions : list, x86:bool) -> None:
@@ -114,6 +141,10 @@ def emit_comparison_true(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "lt":
         asm_instructions.append(ASM_Label("lt_true"))
         asm_instructions.append(ASM_Comment("less than"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_true"))
+        asm_instructions.append(ASM_Comment("less than or equal"))
+    asm_instructions.append(ASM_Comment("Just create a bool and set 0 to its raw int."))
     asm_instructions.append(ASM_Push("fp"))
     asm_instructions.append(ASM_Push(self_reg))
     asm_instructions.append(ASM_Call_Label("Bool..new"))
@@ -128,6 +159,8 @@ def emit_comparison_true(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Jmp("eq_end"))
     elif type == "lt":
         asm_instructions.append(ASM_Jmp("lt_end"))
+    elif type == "le":
+        asm_instructions.append(ASM_Jmp("le_end"))
 
 
 # IMPORTANT - this should fall through to eq_int.
@@ -136,6 +169,8 @@ def emit_comparison_bool(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Label("eq_bool"))
     elif type == "lt":
         asm_instructions.append(ASM_Label("lt_bool"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_bool"))
     asm_instructions.append(ASM_Comment("two bools"))
 
 def emit_comparison_int(type:str,asm_instructions : list, x86:bool) -> None:
@@ -143,7 +178,10 @@ def emit_comparison_int(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Label("eq_int"))
     elif type == "lt":
         asm_instructions.append(ASM_Label("lt_int"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_int"))
     asm_instructions.append(ASM_Comment("two ints"))
+    asm_instructions.append(ASM_Comment("both ints and bools just compare their raw underlying integer values."))
 
     # args
     if not x86:
@@ -163,6 +201,9 @@ def emit_comparison_int(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "lt":
         asm_instructions.append(ASM_Blt(acc_reg,temp_reg,"lt_true"))
         asm_instructions.append(ASM_Jmp("lt_false"))
+    elif type == "le":
+        asm_instructions.append(ASM_Ble(acc_reg,temp_reg,"le_true"))
+        asm_instructions.append(ASM_Jmp("le_false"))
 
 # IMPORTANT - tihs must be emitted
 def emit_comparison_end(type:str,asm_instructions : list, x86:bool) -> None:
@@ -171,6 +212,8 @@ def emit_comparison_end(type:str,asm_instructions : list, x86:bool) -> None:
         asm_instructions.append(ASM_Label("eq_end"))
     elif type == "lt":
         asm_instructions.append(ASM_Label("lt_end"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_end"))
 
     # x86 handles cleanup in caller
     # cool does so in callee.
