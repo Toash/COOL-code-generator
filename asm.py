@@ -141,6 +141,8 @@ class CoolAsmGen:
 
             case ASM_Jmp(label):
                 return f"jmp {label}"
+            case ASM_Bnz(reg,label):
+                return f"bnz {reg} {label}"
             case ASM_Beq(left,right,label):
                 return f"beq {left} {right} {label}"
 
@@ -425,11 +427,16 @@ class CoolAsmGen:
 
             # we need to actually load these args in .
 
+            self.append_asm(ASM_Comment("start code-genning method body"))
             self.cgen(exp)
+            self.append_asm(ASM_Comment("done code-genning method body"))
 
             # ------------ EPILOGUE -----------------
 
-            # args + self and return ?
+            # args 
+            # +1 for self ( we never actually pop r0 on method start
+            #                    unlike the reference compiler.)
+            # +1 for return  ( we dont pop it, we just read it from top.)
             stack_cleanup_size=num_args+2
             self.emit_function_epilogue(stack_cleanup_size)
 
@@ -451,8 +458,6 @@ class CoolAsmGen:
     leave stack the way we found it 
     """
     def cgen(self, exp)->None:
-
-
         self.comment(f"cgen+: {type(exp).__name__}")
 
         # locs = []
@@ -474,21 +479,44 @@ class CoolAsmGen:
                 self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
 
             case If(Predicate, Then, Else):
-                # print("If predicate:", Predicate)
-                # print("If then:", Then)
-                # print("If else:", Else)
+                then_label = "true_" + self.get_branch_label()
+                else_label = "false_" + self.get_branch_label()
+                end_label = "end_" + self.get_branch_label()
 
                 # predicate
+                match Predicate[1]:
+                    case true(Value):
+                        self.cgen(New(Type="Bool", StaticType="Bool"))
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
+                        self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Bnz(acc_reg,then_label))
+                        
+                    case false(Value):
+                        self.cgen(New(Type="Bool", StaticType="Bool"))
+                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Bnz(acc_reg,then_label))
 
-                # then
-                self.comment("THEN",not_tabbed=True)
-                self.append_asm(ASM_Label(self.get_branch_label()))
-                self.cgen(Then[1])
+                    case _:
+                       print("Unhandled predicate:", Predicate) 
 
                 # else
-                self.comment("ELSE",not_tabbed=True)
-                self.append_asm(ASM_Label(self.get_branch_label()))
+                self.comment("ELSE (False branch)",not_tabbed=True)
+                self.append_asm(ASM_Label(else_label))
                 self.cgen(Else[1])
+                self.append_asm(ASM_Jmp(end_label))
+
+                # then
+                self.comment("THEN (True branch)",not_tabbed=True)
+                self.append_asm(ASM_Label(then_label))
+                self.cgen(Then[1])
+
+                # end
+                self.comment("END of if conditional")
+                self.append_asm(ASM_Label(end_label))
+
+                # Accumulater will contain the result of either the then or else.
+
 
             case Block(Body):
                 for exp in Body:
@@ -687,8 +715,8 @@ class CoolAsmGen:
     def gen_dispatch_helper(self, Exp, Method, Args):
 
         #save self object and frame pointer to restore later
-        self.append_asm(ASM_Push(self_reg))
         self.append_asm(ASM_Push("fp"))
+        self.append_asm(ASM_Push(self_reg))
 
         """
         Here how the stack frame look like:
@@ -747,8 +775,8 @@ class CoolAsmGen:
 
         # self.add_asm(ASM_Pop(self_reg))
         # get back old frame pointer
-        self.append_asm(ASM_Pop("fp"))
         self.append_asm(ASM_Pop(self_reg))
+        self.append_asm(ASM_Pop("fp"))
 
 
     def comment(self,comment,not_tabbed=False):
