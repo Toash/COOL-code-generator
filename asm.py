@@ -713,10 +713,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_Pop(temp_reg))
 
                 self.comment("Load unboxed integers.")
-                self.append_asm(ASM_Ld(
-                    dest = acc_reg,
-                    src = acc_reg,
-                    offset = attributes_start_index))
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.comment("Divide unboxed integers.")
@@ -849,14 +846,21 @@ class CoolAsmGen:
                 self.pop_scope()
 
 
-            # this should update the  
             case Let_No_Init(Var,Type):
-                # add the variable to the symbol table.
                 var = Var[1]
                 self.cgen(New(Type=Type.str,StaticType=Type.str))
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.insert_symbol(var,Offset("fp",self.temporary_index))
-                self.temporary_index-=1
+                self.temporary_index -= 1
+
+            case Let_Init(Var,Type,Exp):
+                var = Var[1]
+                self.cgen(Exp[1])
+                
+                self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
+                self.insert_symbol(var,Offset("fp",self.temporary_index))
+                self.temporary_index -= 1
+
 
             case Internal(Body):
 

@@ -30,4 +30,14 @@ echo
 cool ./tests/let_no_init.cl
 echo
 
+echo
+
+echo "Let (init) test..."
+cool --type ./tests/let_init.cl
+python3 main.py ./tests/let_init.cl-type
+gcc -no-pie -static file.s
+./a.out
+echo
+cool ./tests/let_init.cl
+echo
 
