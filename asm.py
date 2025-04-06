@@ -118,7 +118,7 @@ class CoolAsmGen:
         else:
             return self.asm_instructions
 
-    def flush_asm(self,outfile,include_comments = True) -> None:
+    def flush_asm(self,outfile,include_comments = False) -> None:
         if include_comments:
             for instr in self.asm_instructions:
                 outfile.write(self.format_asm(instr,outfile) + "\n")
@@ -131,7 +131,7 @@ class CoolAsmGen:
         self.asm_instructions.append(instr)
 
     def format_asm(self,instr:namedtuple,outfile) -> str:
-        tabs="\t\t"
+        tabs="\t\t\t\t"
 
 
         if type(instr).__name__ != "ASM_Label" and type(instr).__name__ != "ASM_Comment":
@@ -495,6 +495,7 @@ class CoolAsmGen:
 
 
             # alignment padding
+            # this is important
             self.comment("16 byte alignment padding")
             self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
             self.append_asm(ASM_Sub(temp_reg,"sp"))
@@ -960,8 +961,8 @@ class CoolAsmGen:
         # so we do it in the caller, where the return address has already been popped off by ret.
         if self.x86:
             self.comment(f"x86- clean up stack.")
-            self.append_asm(ASM_Li(acc_reg,ASM_Word(len(Args)+1)))
-            self.append_asm(ASM_Add(acc_reg,"sp"))
+            self.append_asm(ASM_Li(temp_reg,ASM_Word(len(Args)+1)))
+            self.append_asm(ASM_Add(temp_reg,"sp"))
             pass
 
         # self.add_asm(ASM_Pop(self_reg))

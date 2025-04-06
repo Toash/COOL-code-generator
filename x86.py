@@ -40,6 +40,7 @@ class X86Gen:
                     if isinstance(imm,ASM_Value):
                         self.outfile.write(f"movq ${imm.value}, {self.get_reg(reg)}\n")
                     elif isinstance(imm, ASM_Word):
+                        
                         self.outfile.write(f"movq ${int(imm.value) * 8}, {self.get_reg(reg)}\n")
                     else:
                         raise Exception("Immediate should be ASM_Value or ASM_Word")
@@ -184,9 +185,100 @@ class X86Gen:
                             self.outfile.write("movl $0, %eax\t## required by printf.\n")
                             self.tab()
                             self.outfile.write("call printf\n")
+                        case "IO.in_int":
+                            self.tab()
+                            self.outfile.write("## start of in_int\n")
+                            self.tab()
+                            self.outfile.write("movl $1, %esi\n")
+                            self.tab()
+                            self.outfile.write("movl $4096, %edi\n")
+                            
+                            self.tab()
+                            self.outfile.write("## Generate array of 4096 chars\n")
+
+                            self.tab()
+                            # generate array of 4096 characters where string will be stored.
+                            self.outfile.write("call calloc\n")
+                            self.tab()
+                            self.outfile.write("pushq %rax\n")
+                            # im starting to regret these tabs
+                            self.tab()
+                            self.outfile.write("movq %rax, %rdi\n")
+                            self.tab()
+                            self.outfile.write("movq $4096, %rsi\n")
+                            self.tab()
+
+                            self.outfile.write("## put stdin stream into %rdx.\n")
+
+                            self.tab()
+                            # the stream
+                            self.outfile.write("movq stdin(%rip), %rdx\n")
+                            
+                            self.tab()
+                            self.outfile.write("## fgets has\n")
+                            self.tab()
+                            self.outfile.write("## rdi - char array\n")
+                            self.tab()
+                            self.outfile.write("## rsi - number of characters to read (4096)\n")
+                            self.tab()
+                            self.outfile.write("## rdx - the stream to read from (stdin)\n")
+                            self.tab()
+                            self.outfile.write("call fgets\n")
+
+                            self.tab()
+                            self.outfile.write("popq %rdi\n")
+                            self.tab()
+                            self.outfile.write("movl $0, %eax\n")
+                            self.tab()
+                            self.outfile.write("pushq %rax\n")
+                            self.tab()
+
+                            # sscanf will write to top of stack.
+                            self.outfile.write("## sscanf will write to top of stack.\n")
+
+                            self.tab()
+                            self.outfile.write("movq %rsp, %rdx\n")
+                            self.tab()
+                            self.outfile.write("movq $percent.ld, %rsi\n")
+
+                            # with the ld placeholder, only parse an integer from the input string.
+                            self.tab()
+                            self.outfile.write("## with placeholder, only parse integer from input string.\n")
+
+                            self.tab()
+                            self.outfile.write("## sscanf has:\n")
+                            self.tab()
+                            self.outfile.write("## rdi - char array\n")
+                            self.tab()
+                            self.outfile.write("## rsi - placeholders\n")
+                            self.tab()
+                            self.outfile.write("## rdx - output stream\n")
+
+
+                            self.tab()
+                            self.outfile.write("call sscanf\n")
+                            self.tab()
+                            # inputted integer now in rax.
+                            self.outfile.write("popq %rax\n")
+                            self.tab()
+                            self.outfile.write("movq $0, %rsi\n")
+                            self.tab()
+                            # clamp to 32 bit signed int range.
+                            self.outfile.write("cmpq $2147483647, %rax\n")
+                            self.tab()
+                            self.outfile.write("cmovg %rsi, %rax\n")
+                            self.tab()
+                            self.outfile.write("cmpq $-2147483648, %rax\n")
+                            self.tab()
+                            self.outfile.write("cmovl %rsi, %rax\n")
+                            self.tab()
+                            self.outfile.write("movq %rax, %r13\n")
+                            self.tab()
+                            self.outfile.write("## we now have the raw value in %r13.\n")
                         case _:
                             self.tab()
-                            self.outfile.write(f"TODO: implement system call for \"{name}\".\n")
+                            raise Exception("Implement system call for ",name)
+                            # self.outfile.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_label(label):
                     self.tab()
                     self.outfile.write(f".quad {label}\n")
@@ -200,6 +292,8 @@ class X86Gen:
 
                 case _:
                     print("x86: Unhandled Cool_asm:",instr)
+
+    # this was not a good idea
     def tab(self):
         self.outfile.write("\t\t")
 
@@ -220,6 +314,19 @@ class X86Gen:
     def c_placeholders(self):
         # integer
         self.outfile.write("percent.d:\n")
+        self.tab()
+        self.outfile.write(".byte 37 \t# '%'\n")
+        self.tab()
+        self.outfile.write(".byte 108 \t# 'l'\n")
+        self.tab()
+        self.outfile.write(".byte 100 \t# 'd'\n")
+        self.tab()
+        self.outfile.write(".byte 0\n")
+
+        # long integer
+        self.outfile.write("percent.ld:\n")
+        self.tab()
+        self.outfile.write(".byte 32 \t# ' '\n")
         self.tab()
         self.outfile.write(".byte 37 \t# '%'\n")
         self.tab()
