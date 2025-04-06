@@ -547,7 +547,7 @@ class CoolAsmGen:
     (append instuctions to our asm list)
     leave stack the way we found it 
     """
-    def cgen(self, exp)->None:
+    def cgen(self, exp, as_predicate = False)->None:
         self.comment(f"cgen+: {exp}")
 
         # locs = []
@@ -594,15 +594,24 @@ class CoolAsmGen:
                 # predicate
                 match Predicate[1]:
                     case Lt(Left,Right):
-                        self.cgen(Lt(Left,Right,StaticType="Bool"))                        
+                        self.cgen(Lt(Left,Right,StaticType="Bool"), as_predicate=True)                        
                     case Le(Left,Right):
-                        self.cgen(Le(Left,Right,StaticType="Bool"))                        
+                        self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)                        
                     case Eq(Left,Right):
-                        self.cgen(Eq(Left,Right,StaticType="Bool"))                        
+                        self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)                        
+
+                    case Not(Exp):
+                        self.cgen(Exp[1])  
+                        self.append_asm(ASM_Ld(temp_reg, acc_reg, attributes_start_index))
+                        self.append_asm(ASM_Li(acc_reg, ASM_Value(1)))
+                        self.append_asm(ASM_Sub(temp_reg, acc_reg))  
+                        self.cgen(New(Type="Bool", StaticType="Bool"))
+                        self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
+
                     case true(Value):
-                        self.cgen(true(Value,StaticType="Bool"))
+                        self.cgen(true(Value,StaticType="Bool"), as_predicate=True)
                     case false(Value):
-                        self.cgen(false(Value,StaticType="Bool"))
+                        self.cgen(false(Value,StaticType="Bool"), as_predicate=True)
                     case _:
                        print("Unhandled predicate:", Predicate) 
 
@@ -812,7 +821,8 @@ class CoolAsmGen:
 
                 # less than handler gave us something
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,3))
-                self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
+                if as_predicate:
+                    self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
 
             case Integer(Integer=val, StaticType=st):
                 # make new int , (default initialized with 0)
@@ -851,12 +861,15 @@ class CoolAsmGen:
                 self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
+                if as_predicate: 
+                    self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
                 
             case false(Value):
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
+                if as_predicate:
+                    self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
+
 
             case Let(Bindings,Body):
                 # pushing new scope so that we can store the positions for varibles.
