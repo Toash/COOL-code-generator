@@ -118,7 +118,7 @@ class CoolAsmGen:
         else:
             return self.asm_instructions
 
-    def flush_asm(self,outfile,include_comments = False) -> None:
+    def flush_asm(self,outfile,include_comments = True) -> None:
         if include_comments:
             for instr in self.asm_instructions:
                 outfile.write(self.format_asm(instr,outfile) + "\n")
@@ -425,13 +425,20 @@ class CoolAsmGen:
                 if index == 1:
                     self.comment("Getting args.")
 
-                # + 1 because of base pointer
-                # + 1 because of return address
-                # + 1 because of self object
-                # after all that, we actually get the arguments. (that were pushed by caller)
-                # leftmost arguments are closer to the frame pointer.
-                # the self object is right next to the frame pointer.
-                fp_offset=num_args-index + 1 + 1 + 1 
+
+                if self.x86:
+                    # + 1 because of return address
+                    # + 1 because of self object
+                    # + 1 to get the actual index
+                    # after all that, we actually get the arguments. (that were pushed by caller)
+                    # leftmost arguments are closer to the frame pointer.
+                    # the self object is right next to the frame pointer.
+                    fp_offset=num_args-index + 1 + 1 + 1 
+                else:
+
+                    # +1 because of self object
+                    # + 1 to get the actual index
+                    fp_offset=num_args-index + 1 + 1 
 
                 # these formals live at at offset of the frame pointer.
                 self.comment(f"Add argument {arg} to symbol table, it lives in fp[{fp_offset}]")
@@ -536,7 +543,7 @@ class CoolAsmGen:
     leave stack the way we found it 
     """
     def cgen(self, exp)->None:
-        self.comment(f"cgen+: {type(exp).__name__}")
+        self.comment(f"cgen+: {exp}")
 
         # locs = []
         # for var, loc in self.symbol_stack[-1].items():
@@ -863,18 +870,32 @@ class CoolAsmGen:
 
 
             case Internal(Body):
+                
+                match Body:
+                    # when we loop through function args, store reference to arg (x) to offset in symbol table.
+                    #  now when we go here, we know where x lives. 
+                    # The caller should pass in 1 argument ( not including self)
+                    case "IO.out_int":
+                        # in the case of out_int, x should be an integer.
+                        self.cgen(Identifier(Var="x", StaticType=None))
 
-                if Body == "IO.out_int":
-                    # in the case of out_int, x should be an integer.
-                    self.cgen(Identifier(Var="x", StaticType=None))
+                        self.comment("Load unboxed int.")
+                        self.append_asm(ASM_Ld(acc_reg, acc_reg, attributes_start_index))
 
-                    self.comment("Load unboxed int.")
-                    self.append_asm(ASM_Ld(acc_reg, acc_reg, attributes_start_index))
+                        self.append_asm(ASM_Syscall(Body))
 
-                    self.append_asm(ASM_Syscall(Body))
-                else:
-                    # print("Unhandled Internal: ",Body)
-                    pass
+                    # creates an Int, gets input from user, stores that in the Int
+                    case "IO.in_int":
+                        self.cgen(New(Type="Int",StaticType="Int"))
+                        self.append_asm(ASM_Mov(temp_reg,acc_reg))
+                        self.append_asm(ASM_Syscall(Body))
+                        # int input now in accumulator.
+                        # store that val in our new int.
+                        self.append_asm(ASM_St(temp_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Mov(acc_reg,temp_reg))
+                    case _: 
+                        # raise Exception("Unhandled internal method: ", Body)
+                        pass
             case _:
                 print("Unknown expression in cgen: ", exp)
                 pass
@@ -964,6 +985,7 @@ class CoolAsmGen:
     def insert_symbol(self, symbol:str, loc:Register | Offset):
         self.comment(f"adding {symbol} to symbol table with value {loc}")
         self.symbol_stack[-1][symbol] = loc
+        # print(self.symbol_stack)
 
     def lookup_symbol(self, symbol:str):
         for scope in reversed(self.symbol_stack):
