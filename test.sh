@@ -9,6 +9,16 @@ echo
 
 echo
 
+echo "Assignment test..."
+cool --type ./tests/assignment.cl
+python3 main.py ./tests/assignment.cl-type
+gcc -no-pie -static file.s
+./a.out
+echo
+cool ./tests/assignment.cl
+echo
+
+echo
 
 echo "Bool (no let) test..."
 cool --type ./tests/bool_no_let.cl

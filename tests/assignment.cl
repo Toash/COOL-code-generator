@@ -5,6 +5,8 @@ class Main inherits IO{
         {
             x<-1337;
             out_int(x);
+            x<-420;
+            out_int(x);
         }
     };
 };

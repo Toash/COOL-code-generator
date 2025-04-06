@@ -378,11 +378,15 @@ class CoolAsmGen:
                 body_depth = self.compute_max_stack_depth(Body[1])
                 return max(total_let_depth, body_depth)
 
+            case Assign():
+                return 0
+
             case Internal():
                 return 0
 
             case Self_Dispatch () | Dynamic_Dispatch() | Static_Dispatch():
                 return 0
+
             case _:
                 print("Unhandled in stack analysis:", exp)
                 return 0
@@ -557,6 +561,24 @@ class CoolAsmGen:
         # self.comment(f"\t\t\tsymbol_table in current scope: {locs}")
 
         match exp:
+
+            # Assign
+            # programs pass through semantic analyzer so we shouldnt have to check if var is  defined i guess?
+            case Assign(Var,Exp):
+
+                # print(self.lookup_symbol(Var[1]))
+
+                self.cgen(Exp[1])
+
+                match self.lookup_symbol(Var[1]):
+                    case Offset(reg,offset):
+                        self.append_asm(ASM_St(reg,acc_reg,offset))
+                    case Register(reg):
+                        self.append_asm(ASM_Mov(reg,acc_reg))
+                    case _:
+                        raise Exception("Unhandled symbol location")
+                
+
 
             # Dispatch
             case Dynamic_Dispatch(Exp,Method,Args):
