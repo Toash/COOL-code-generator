@@ -51,3 +51,13 @@ echo
 cool ./tests/let_init.cl
 echo
 
+echo
+
+echo "Unary test..."
+cool --type ./tests/unary.cl
+python3 main.py ./tests/unary.cl-type
+gcc -no-pie -static file.s
+./a.out
+echo
+cool ./tests/unary.cl
+echo

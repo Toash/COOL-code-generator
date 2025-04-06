@@ -599,17 +599,8 @@ class CoolAsmGen:
                         self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)                        
                     case Eq(Left,Right):
                         self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)                        
-
                     case Not(Exp):
-                        self.cgen(Exp[1], as_predicate=False)  
-                        self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
-                        self.append_asm(ASM_Li(temp2_reg, ASM_Value(1)))
-                        self.append_asm(ASM_Sub(temp_reg, temp2_reg))  
-                        self.cgen(New(Type="Bool", StaticType="Bool"))
-                        self.append_asm(ASM_St(acc_reg, temp2_reg, attributes_start_index))
-                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                        self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
-
+                        self.cgen(Not(Exp,StaticType="Bool"),as_predicate=True)
                     case true(Value):
                         self.cgen(true(Value,StaticType="Bool"), as_predicate=True)
                     case false(Value):
@@ -823,8 +814,29 @@ class CoolAsmGen:
 
                 # less than handler gave us the bool 
                 if as_predicate:
-                    self.append_asm(ASM_Ld(acc_reg,acc_reg,3))
+                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                     self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
+
+
+            case Not(Exp):
+                self.cgen(Exp[1], as_predicate=False)  
+                self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Li(temp2_reg, ASM_Value(1)))
+                self.append_asm(ASM_Sub(temp_reg, temp2_reg))  
+                self.cgen(New(Type="Bool", StaticType="Bool"))
+                self.append_asm(ASM_St(acc_reg, temp2_reg, attributes_start_index))
+
+                if as_predicate:
+                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                    self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
+
+            case Negate(Exp):
+                self.cgen(Exp[1])
+                self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Li(temp2_reg,ASM_Value(-1)))
+                self.append_asm(ASM_Mul(temp2_reg,temp_reg))
+                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+
 
             case Integer(Integer=val, StaticType=st):
                 # make new int , (default initialized with 0)
