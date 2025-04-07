@@ -49,7 +49,8 @@ class CoolAsmGen:
         # variable could live in register
         # or offset ( fp[4] )
         self.symbol_stack = [{}]
-        # when going to into method - check for   
+
+        # when going to into method - check how much space needed on stack for memory allocation. 
         self.temporaries_needed= 0
         self.temporary_index = 0
 
@@ -61,16 +62,30 @@ class CoolAsmGen:
         # because we need the type to call the constructor.
         self.current_class = None
 
+        # when generating branches in conditionals, need to make unique labels
         self.branch_counter = 0
+
+        # maps strings to the labels that contain the allocated memory.
+        self.string_label_counter = 0
+        self.string_to_label = {}
 
         # parse .cl-type, get information
         parser = AnnotatedAstReader(file)
         self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
 
         # Internal attributes 
-        self.class_map["Int"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
+        # we done specify initializer as we handle them ourselves.
+        self.class_map["Int"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
         # bool also holds a raw int like the Int object.
-        self.class_map["Bool"].append(Attribute("val","Unboxed_Int",("0",Integer("0","Int"))))
+        self.class_map["Bool"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
+        self.class_map["String"].append(Attribute(Name="val",Type="Unboxed_String", Initializer=None))
+
+        # populate string to labels mapping:
+        for class_name in self.class_map:
+            self.insert_to_string_label(class_name)
+
+
+
 
         self.emit_vtables()
         self.emit_constructors()
@@ -78,6 +93,8 @@ class CoolAsmGen:
         self.cond_then_label = ""
         self.cond_else_label = ""
         self.cond_end_label = ""
+
+        emit_string_constants(self.asm_instructions,x86,self.string_to_label)
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
@@ -118,7 +135,7 @@ class CoolAsmGen:
         else:
             return self.asm_instructions
 
-    def flush_asm(self,outfile,include_comments = False) -> None:
+    def flush_asm(self,outfile,include_comments = True) -> None:
         if include_comments:
             for instr in self.asm_instructions:
                 outfile.write(self.format_asm(instr,outfile) + "\n")
@@ -195,11 +212,13 @@ class CoolAsmGen:
                 return f"ld {dest} <- {src}[{offset}]"
             case ASM_St(dest,src,offset):
                 return f"st {dest}[{offset}] <- {src}"
-
             case ASM_La(reg, label):
                 return f"la {reg} <- {label}"
+
             case ASM_Alloc(dest,src):
                 return f"alloc {dest} {src}"
+            case ASM_Constant_raw_string(string):
+                return f"constant \"{string}\""
             case ASM_Constant_label(label):
                 return f"constant {label}"
 
@@ -324,9 +343,12 @@ class CoolAsmGen:
                 if attr.Type == "Unboxed_Int":
                     self.comment(f"Store raw int {0} for attribute in Int.")
                     self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
+                elif attr.Type == "Unboxed_String":
+                    self.comment(f"Store raw string for attribute in String.")
+                    self.append_asm(ASM_La(acc_reg,"the.empty.string"))
                 else:
                     self.comment(f"Create new object for {attr.Type}")
-                    self.cgen(New(Type=attr.Type))
+                    self.cgen(New(Type=attr.Type,StaticType=attr.Type))
                 # store attribute in allocated self object.
                 self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
 
@@ -337,6 +359,10 @@ class CoolAsmGen:
             for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
                 if attr.Type == "Unboxed_Int":
                     continue # already initialized this to 0.
+                if attr.Type == "Unboxed_String":
+                    continue # already initialized this to empty string.
+                if not attr.Initalizer:
+                    continue
 
                 exp = attr.Initializer[1]
                 # generate code for the initializer and put it in r1 (accumulator)
@@ -849,6 +875,19 @@ class CoolAsmGen:
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
                 # Integer object now in accumulator register.
 
+            case String(String=val):
+                self.cgen(New(Type="String",StaticType="String"))
+
+                # add to string label map 
+                # so that we allocate some memory in our assembly program.
+                self.insert_to_string_label(val)
+
+                # load that label into the string object we created.
+                self.comment(f"\"{val}\" points to label {self.string_to_label[val]}")
+                self.append_asm(ASM_La(temp_reg,self.string_to_label[val]))
+                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+
+
             # look up in symbol table, if found, store in accumulator.
             case Identifier(Var):
                 if isinstance(Var,ID):
@@ -943,6 +982,18 @@ class CoolAsmGen:
                         # store that val in our new int.
                         self.append_asm(ASM_St(temp_reg,acc_reg,attributes_start_index))
                         self.append_asm(ASM_Mov(acc_reg,temp_reg))
+
+                    case "IO.out_string":
+                        self.cgen(Identifier(Var="x", StaticType=None))
+                        
+                        self.comment("Load unboxed string")
+                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Syscall(Body))
+
+                        self.comment("IO.out_string stores output into self register.")
+                        self.append_asm(ASM_Mov(acc_reg,self_reg))
+
+                        
                     case _: 
                         # raise Exception("Unhandled internal method: ", Body)
                         pass
@@ -1048,6 +1099,10 @@ class CoolAsmGen:
     def get_branch_label(self):
         self.branch_counter+=1
         return f"branch_{self.branch_counter}"
+
+    def insert_to_string_label(self,string):
+        self.string_label_counter+=1
+        self.string_to_label[string] = f"string{self.string_label_counter}"
 
 
 if __name__ == "__main__":
