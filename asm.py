@@ -53,6 +53,7 @@ class CoolAsmGen:
 
         # when going to into method - check how much space needed on stack for memory allocation.
         self.temporaries_needed= 0
+        # used for calculating offsets from frame pointer.
         self.temporary_index = 0
 
         # store index with <type, mname>
@@ -133,7 +134,7 @@ class CoolAsmGen:
 
         # lol
         if not include_comments:
-            for asm_instr in asm_instructions_no_debug:
+            for asm_instr in asm_instructions:
                 if(not isinstance(asm_instr,ASM_Comment)):
                     asm_instructions_no_comments.append(asm_instr)
 
@@ -955,7 +956,7 @@ class CoolAsmGen:
                 self.comment("Code generating let body.")
                 self.cgen(Body[1])
 
-                # when done, pop the symbol table off stack.
+                self.temporary_index = 0
                 self.pop_scope()
 
 
@@ -1102,15 +1103,18 @@ class CoolAsmGen:
     def push_scope(self):
         self.comment(f"Entering new scope for symbol table.")
         self.symbol_stack.append({})
+        # print("push  scope:",self.symbol_stack)
 
     def pop_scope(self):
         self.comment(f"Leaving current scope for symbol table.")
         self.symbol_stack.pop()
+        # print("pop scope:",self.symbol_stack)
 
     def insert_symbol(self, symbol:str, loc:Register | Offset):
         self.comment(f"adding {symbol} to symbol table with value {loc}")
         self.symbol_stack[-1][symbol] = loc
-        # print(self.symbol_stack)
+        # print("insert symbol:",self.symbol_stack)
+        
 
     def lookup_symbol(self, symbol:str):
         for scope in reversed(self.symbol_stack):

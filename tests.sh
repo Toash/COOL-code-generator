@@ -65,12 +65,12 @@ echo
 echo
 
 echo "PA3c3 test...."
-cool --type ./tests/simple2.cl
-python3 main.py ./tests/simple2.cl-type
+cool --type ./tests/pa3.cl
+python3 main.py ./tests/pa3.cl-type
 gcc -no-pie -static file.s
 ./a.out
 echo
-cool ./tests/simple2.cl
+cool ./tests/pa3.cl
 echo
 
 
