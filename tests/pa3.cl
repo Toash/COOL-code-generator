@@ -35,14 +35,13 @@ class Main inherits IO{
                     }
                 else
                     {
-                        out_int(y);
                         out_int(x);
+                        out_int(y);
                     }
                 fi;
 
                 if x<=x then
                     {
-                        out_int(x);
                         out_int(x);
                     }
                 else
@@ -53,7 +52,6 @@ class Main inherits IO{
 
                 if x=x then
                     {
-                        out_int(x);
                         out_int(x);
                     }
                 else

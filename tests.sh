@@ -64,6 +64,16 @@ echo
 
 echo
 
+echo "scopes test...."
+cool --type ./tests/scopes.cl
+python3 main.py ./tests/scopes.cl-type
+gcc -no-pie -static file.s
+./a.out
+echo
+cool ./tests/scopes.cl
+echo
+echo
+
 echo "PA3c3 test...."
 cool --type ./tests/pa3.cl
 python3 main.py ./tests/pa3.cl-type
