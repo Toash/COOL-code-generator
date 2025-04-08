@@ -15,7 +15,7 @@ rsp - stack pointer
 """
 class X86Gen:
     def __init__(self, cl_type):
-        outfile_name = "file.s"
+        outfile_name = cl_type.replace(".cl-type",".s") 
         cool_asm_gen = CoolAsmGen(file=cl_type,x86=True)
 
         try:

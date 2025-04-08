@@ -1,96 +1,40 @@
-echo "Arithmetic test..."
-cool --type ./tests/arith.cl
-python3 main.py ./tests/arith.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/arith.cl
-echo
+#!/bin/bash
 
-echo
+TESTS=(
+  "arith"
+  "assignment"
+  "bool_no_let"
+  "let_no_init"
+  "let_init"
+  "unary"
+  "scopes"
+  "pa3"
+)
 
-echo "Assignment test..."
-cool --type ./tests/assignment.cl
-python3 main.py ./tests/assignment.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/assignment.cl
-echo
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' 
 
-echo
+for test in "${TESTS[@]}"; do
+  echo "Running $test..."
 
-echo "Bool (no let) test..."
-cool --type ./tests/bool_no_let.cl
-python3 main.py ./tests/bool_no_let.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/bool_no_let.cl
-echo
+  cool --type "./tests/$test.cl"
+  python3 ./src/main.py "./tests/$test.cl-type"
+  gcc -no-pie -static ./tests/$test.s -o my_out
+  ./my_out > my_output.txt
 
-echo
+  cool "./tests/$test.cl" > ref_output.txt
 
-echo "Let (no init) test..."
-cool --type ./tests/let_no_init.cl
-python3 main.py ./tests/let_no_init.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/let_no_init.cl
-echo
+  if diff -q my_output.txt ref_output.txt > /dev/null; then
+    echo -e "${GREEN}[PASS]${NC} $test"
+  else
+    echo -e "${RED}[FAIL]${NC} $test"
+    echo "Diff:"
+    diff my_output.txt ref_output.txt
+  fi
 
-echo
+  echo
+done
 
-echo "Let (init) test..."
-cool --type ./tests/let_init.cl
-python3 main.py ./tests/let_init.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/let_init.cl
-echo
-
-echo
-
-echo "Unary test..."
-cool --type ./tests/unary.cl
-python3 main.py ./tests/unary.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/unary.cl
-echo
-
-echo
-
-echo "scopes test...."
-cool --type ./tests/scopes.cl
-python3 main.py ./tests/scopes.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/scopes.cl
-echo
-echo
-
-echo "PA3c3 test...."
-cool --type ./tests/pa3.cl
-python3 main.py ./tests/pa3.cl-type
-gcc -no-pie -static file.s
-./a.out
-echo
-cool ./tests/pa3.cl
-echo
-
-
-echo
-
-# echo "String test..."
-# cool --type ./tests/string.cl
-# python3 main.py ./tests/string.cl-type
-# gcc -no-pie -static file.s
-# ./a.out
-# echo
-# cool ./tests/string.cl
-# echo
+rm my_output.txt
+rm ref_output.txt
