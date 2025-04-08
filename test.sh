@@ -64,12 +64,23 @@ echo
 
 echo
 
-echo "String test..."
-cool --type ./tests/string.cl
-python3 main.py ./tests/string.cl-type
+echo "PA3c3 test...."
+cool --type ./tests/simple2.cl
+python3 main.py ./tests/simple2.cl-type
 gcc -no-pie -static file.s
 ./a.out
 echo
-cool ./tests/string.cl
+cool ./tests/simple2.cl
 echo
 
+
+echo
+
+# echo "String test..."
+# cool --type ./tests/string.cl
+# python3 main.py ./tests/string.cl-type
+# gcc -no-pie -static file.s
+# ./a.out
+# echo
+# cool ./tests/string.cl
+# echo

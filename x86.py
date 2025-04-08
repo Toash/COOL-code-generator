@@ -275,10 +275,19 @@ class X86Gen:
                             self.outfile.write("movq %rax, %r13\n")
                             self.tab()
                             self.outfile.write("## we now have the raw value in %r13.\n")
+                        case "IO.out_string":
+                            # self.tab()
+                            # self.outfile.write("call cooloutstr\n")
+
+                            pass
                         case _:
                             self.tab()
                             raise Exception("Implement system call for ",name)
                             # self.outfile.write(f"TODO: implement system call for \"{name}\".\n")
+                case ASM_Constant_raw_string(string):
+                    self.tab()
+                    for char in string:
+                        self.outfile.write(f".byte {ord(char)}\n")
                 case ASM_Constant_label(label):
                     self.tab()
                     self.outfile.write(f".quad {label}\n")

@@ -26,15 +26,16 @@ Stack should be the same before and after a method call.
 
 Next address stored in ra
 - pop when calling function
-- after function ends (stack has to be the same), 
+- after function ends (stack has to be the same),
 
-On function call, 
+On function call,
 - push parameters on stack
-- push receiver object. 
+- push receiver object.
 
 Note: return jumps to ra.
 so after function ends (and stack is the same before call, pop ra then return.)
 """
+
 class CoolAsmGen:
     """
     file - cl-type file name for Parser
@@ -50,7 +51,7 @@ class CoolAsmGen:
         # or offset ( fp[4] )
         self.symbol_stack = [{}]
 
-        # when going to into method - check how much space needed on stack for memory allocation. 
+        # when going to into method - check how much space needed on stack for memory allocation.
         self.temporaries_needed= 0
         self.temporary_index = 0
 
@@ -73,7 +74,7 @@ class CoolAsmGen:
         parser = AnnotatedAstReader(file)
         self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
 
-        # Internal attributes 
+        # Internal attributes
         # we done specify initializer as we handle them ourselves.
         self.class_map["Int"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
         # bool also holds a raw int like the Int object.
@@ -122,27 +123,30 @@ class CoolAsmGen:
 
 
     def get_asm(self,include_comments = False) -> list[namedtuple]:
+        asm_instructions = []
+
+        for instr in self.asm_instructions:
+            if not isinstance(instr,ASM_Debug):
+                asm_instructions.append(instr)
+
         asm_instructions_no_comments = []
 
         # lol
         if not include_comments:
-            for asm_instr in self.asm_instructions:
+            for asm_instr in asm_instructions_no_debug:
                 if(not isinstance(asm_instr,ASM_Comment)):
                     asm_instructions_no_comments.append(asm_instr)
 
         if not include_comments:
             return asm_instructions_no_comments
         else:
-            return self.asm_instructions
+            return asm_instructions
 
-    def flush_asm(self,outfile,include_comments = True) -> None:
-        if include_comments:
-            for instr in self.asm_instructions:
-                outfile.write(self.format_asm(instr,outfile) + "\n")
-        else:
-            for instr in self.asm_instructions:
-                if not isinstance(instr,ASM_Comment):
-                    outfile.write(self.format_asm(instr,outfile) + "\n")
+    def flush_asm(self,outfile,include_comments = False ,debug = False) -> None:
+        for instr in self.asm_instructions:
+            if isinstance(instr,ASM_Comment) and not include_comments: continue
+            if isinstance(instr,ASM_Debug) and not debug: continue
+            outfile.write(self.format_asm(instr,outfile) + "\n")
 
     def append_asm(self,instr: namedtuple) -> None:
         self.asm_instructions.append(instr)
@@ -155,9 +159,11 @@ class CoolAsmGen:
             outfile.write(tabs)
 
         match instr:
+
+            case ASM_Debug(reg):
+                return f"debug {reg}"
             case ASM_Comment(comment,not_tabbed):
                 import re
-
                 result = re.sub(r"^(\s*)", r"\1;;\t", comment)
 
                 #lol
@@ -172,7 +178,7 @@ class CoolAsmGen:
                 return f"li {reg} <- {imm.value}"
             case ASM_Mov(dest, src):
                 return f"mov {dest} <- {src}"
-            
+
             case ASM_Add(left, right):
                 return f"add {right} <- {right} {left}"
             case ASM_Sub(left, right):
@@ -294,7 +300,7 @@ class CoolAsmGen:
 
             if not self.x86:
                 self.append_asm(ASM_Push("ra"))
-           
+
 
             if self.x86:
                 self.comment("stack offset for 16 byte alignment")
@@ -321,7 +327,7 @@ class CoolAsmGen:
                     tag=1000
 
             self.comment(f"Store type tag ({tag} for {cls}) at index {type_tag_index}")
-            self.append_asm(ASM_Li(temp_reg,ASM_Value(tag))) 
+            self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))
             self.append_asm(ASM_St(self_reg, temp_reg, type_tag_index))
 
             # TODO: implement object size
@@ -384,7 +390,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_Pop("ra"))
             self.append_asm(ASM_Return())
 
-    # recursively traverses expression and computes the temporaries 
+    # recursively traverses expression and computes the temporaries
     #   needed to cgen the exp.
     # for example, each let binding needs room on the stack.
     # dont need to reserve room for function args, as they are pushed on the stack prior.
@@ -410,6 +416,9 @@ class CoolAsmGen:
             case Internal():
                 return 0
 
+            case Integer():
+                return 0
+
             case Self_Dispatch () | Dynamic_Dispatch() | Static_Dispatch():
                 return 0
 
@@ -427,7 +436,7 @@ class CoolAsmGen:
             self.append_asm(ASM_Label(f"{cname}.{mname}"))
 
             # ---------------------- PROLOGUE ---------------------
-            
+
             self.emit_function_prologue(exp)
 
             # -------------------- END OF PROLOGUE-----------------------------
@@ -463,12 +472,12 @@ class CoolAsmGen:
                     # after all that, we actually get the arguments. (that were pushed by caller)
                     # leftmost arguments are closer to the frame pointer.
                     # the self object is right next to the frame pointer.
-                    fp_offset=num_args-index + 1 + 1 + 1 
+                    fp_offset=num_args-index + 1 + 1 + 1
                 else:
 
                     # +1 because of self object
                     # + 1 to get the actual index
-                    fp_offset=num_args-index + 1 + 1 
+                    fp_offset=num_args-index + 1 + 1
 
                 # these formals live at at offset of the frame pointer.
                 self.comment(f"Add argument {arg} to symbol table, it lives in fp[{fp_offset}]")
@@ -497,18 +506,18 @@ class CoolAsmGen:
             # self.append_asm(ASM_Ld(self_reg,"sp",1))
             self.append_asm(ASM_Pop(self_reg))
 
-            # we use positive indicies to refer to variables pushed by the caller 
+            # we use positive indicies to refer to variables pushed by the caller
             #   (functoin args, self object)
 
             # we use negative indices to refer to temporaries in the current procedures.
             #   ( let bindings , etc.)
-            
+
             self.append_asm(ASM_Comment("Stack room for temporaries"))
             self.temporaries_needed= self.compute_max_stack_depth(exp)
 
             # i have no idea why this doesnt work without +1....
-            self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed+1))) 
-            self.append_asm(ASM_Sub(temp_reg,"sp")) 
+            self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed+1)))
+            self.append_asm(ASM_Sub(temp_reg,"sp"))
 
             self.append_asm(ASM_Push("ra"))
 
@@ -529,14 +538,14 @@ class CoolAsmGen:
             self.comment("16 byte alignment padding")
             self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
             self.append_asm(ASM_Sub(temp_reg,"sp"))
-            
-            
+
+
 
     def emit_function_epilogue(self,num_args) -> None:
         self.comment("FUNCTION CLEANUP")
         if not self.x86:
             # the cool way
-            # stack layout- 
+            # stack layout-
             #   arg1 .. n
             # self.append_asm(ASM_Ld(dest="ra",src="sp",offset=1)) # return address on top
             self.append_asm(ASM_Pop("ra"))
@@ -548,7 +557,7 @@ class CoolAsmGen:
             # the x86 way
             # stack layout-
             #   arg1 .. n
-            #   self object 
+            #   self object
             #   return address
             self.append_asm(ASM_Mov(dest="sp", src="fp"))
             self.append_asm(ASM_Pop("fp"))
@@ -571,7 +580,7 @@ class CoolAsmGen:
     """
     generate code for e, put on accumulator register.
     (append instuctions to our asm list)
-    leave stack the way we found it 
+    leave stack the way we found it
     """
     def cgen(self, exp, as_predicate = False)->None:
         self.comment(f"cgen+: {exp}")
@@ -603,7 +612,7 @@ class CoolAsmGen:
                         self.append_asm(ASM_Mov(reg,acc_reg))
                     case _:
                         raise Exception("Unhandled symbol location")
-                
+
 
 
             # Dispatch
@@ -620,11 +629,11 @@ class CoolAsmGen:
                 # predicate
                 match Predicate[1]:
                     case Lt(Left,Right):
-                        self.cgen(Lt(Left,Right,StaticType="Bool"), as_predicate=True)                        
+                        self.cgen(Lt(Left,Right,StaticType="Bool"), as_predicate=True)
                     case Le(Left,Right):
-                        self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)                        
+                        self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)
                     case Eq(Left,Right):
-                        self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)                        
+                        self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)
                     case Not(Exp):
                         self.cgen(Not(Exp,StaticType="Bool"),as_predicate=True)
                     case true(Value):
@@ -632,7 +641,7 @@ class CoolAsmGen:
                     case false(Value):
                         self.cgen(false(Value,StaticType="Bool"), as_predicate=True)
                     case _:
-                       print("Unhandled predicate:", Predicate) 
+                       print("Unhandled predicate:", Predicate)
 
                 # else
                 self.comment("ELSE (False branch)",not_tabbed=True)
@@ -699,7 +708,7 @@ class CoolAsmGen:
                     offset = attributes_start_index))
 
                 # Addition result now in accumulator.
-                
+
             case Minus(Left,Right):
                 self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
@@ -798,28 +807,34 @@ class CoolAsmGen:
                 self.append_asm(ASM_Push("fp"))
 
                 left_type =  Left[1].StaticType
-                self.cgen(New(Type= left_type,StaticType=left_type))
-                # load the actual values
                 if(isinstance(Left[1],Integer)):
-                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Left[1].Integer)))    
+                    # create Integer object with raw value inserted.
+                    self.cgen(New(Type= left_type,StaticType=left_type))
+                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Left[1].Integer)))
                     self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                elif(isinstance(Left[1],Identifier)):
+                    self.cgen(Left[1])
                 else:
-                    raise Exception("unhandled operands in bool comparison")
+                    raise Exception("unhandled operands in bool comparison: ",Left[1])
                 self.append_asm(ASM_Push(acc_reg))
 
                 right_type =  Right[1].StaticType
-                self.cgen(New(Type=right_type, StaticType=right_type))
-                # load the actual values
                 if(isinstance(Right[1],Integer)):
-                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Right[1].Integer)))    
+                    # create Integer object with raw value inserted.
+                    self.cgen(New(Type=right_type, StaticType=right_type))
+                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Right[1].Integer)))
                     self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                elif(isinstance(Right[1],Identifier)):
+                    self.cgen(Right[1])
                 else:
-                    raise Exception("unhandled operands in bool comparison")
+                    raise Exception("unhandled operands in bool comparison", Right[1])
                 self.append_asm(ASM_Push(acc_reg))
+
+
                 self.append_asm(ASM_Push(self_reg))
                 # stack:
-                # left
-                # right
+                # left (raw value)
+                # right (raw value)
                 # self object
                 match type(exp).__name__:
                     case "Lt":
@@ -829,7 +844,7 @@ class CoolAsmGen:
                     case "Eq":
                         self.append_asm(ASM_Call_Label("eq_handler"))
                     case _:
-                        raise Exception("Unknown conditional expression:", exp) 
+                        raise Exception("Unknown conditional expression:", exp)
                 if self.x86:
                     self.comment("x86- deallocate two args and self.")
                     self.append_asm(ASM_Li(temp_reg,ASM_Word(3)))
@@ -838,17 +853,17 @@ class CoolAsmGen:
                 self.append_asm(ASM_Pop("fp"))
                 self.append_asm(ASM_Pop(self_reg))
 
-                # less than handler gave us the bool 
+                # less than handler gave us the bool
                 if as_predicate:
                     self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                     self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
 
 
             case Not(Exp):
-                self.cgen(Exp[1], as_predicate=False)  
+                self.cgen(Exp[1], as_predicate=False)
                 self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Li(temp2_reg, ASM_Value(1)))
-                self.append_asm(ASM_Sub(temp_reg, temp2_reg))  
+                self.append_asm(ASM_Sub(temp_reg, temp2_reg))
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 self.append_asm(ASM_St(acc_reg, temp2_reg, attributes_start_index))
 
@@ -878,7 +893,7 @@ class CoolAsmGen:
             case String(String=val):
                 self.cgen(New(Type="String",StaticType="String"))
 
-                # add to string label map 
+                # add to string label map
                 # so that we allocate some memory in our assembly program.
                 self.insert_to_string_label(val)
 
@@ -909,14 +924,16 @@ class CoolAsmGen:
                     case _:
                         raise Exception(f"Could not find identifier {var}!")
 
+                # loaded in acc
+
             case true(Value):
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
-                if as_predicate: 
+                if as_predicate:
                     self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                     self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
-                
+
             case false(Value):
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 if as_predicate:
@@ -952,17 +969,17 @@ class CoolAsmGen:
             case Let_Init(Var,Type,Exp):
                 var = Var[1]
                 self.cgen(Exp[1])
-                
+
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
 
 
             case Internal(Body):
-                
+
                 match Body:
                     # when we loop through function args, store reference to arg (x) to offset in symbol table.
-                    #  now when we go here, we know where x lives. 
+                    #  now when we go here, we know where x lives.
                     # The caller should pass in 1 argument ( not including self)
                     case "IO.out_int":
                         # in the case of out_int, x should be an integer.
@@ -985,7 +1002,7 @@ class CoolAsmGen:
 
                     case "IO.out_string":
                         self.cgen(Identifier(Var="x", StaticType=None))
-                        
+
                         self.comment("Load unboxed string")
                         self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                         self.append_asm(ASM_Syscall(Body))
@@ -993,8 +1010,8 @@ class CoolAsmGen:
                         self.comment("IO.out_string stores output into self register.")
                         self.append_asm(ASM_Mov(acc_reg,self_reg))
 
-                        
-                    case _: 
+
+                    case _:
                         # raise Exception("Unhandled internal method: ", Body)
                         pass
             case _:
@@ -1005,6 +1022,8 @@ class CoolAsmGen:
 
 
     def gen_dispatch_helper(self, Exp, Method, Args):
+
+        self.debug("sp")
 
         #save self object and frame pointer to restore later
         self.append_asm(ASM_Push("fp"))
@@ -1070,7 +1089,12 @@ class CoolAsmGen:
         self.append_asm(ASM_Pop(self_reg))
         self.append_asm(ASM_Pop("fp"))
 
+        # ensure stack integrity
+        self.debug("sp")
 
+
+    def debug(self,reg):
+        self.asm_instructions.append(ASM_Debug(reg))
     def comment(self,comment,not_tabbed=False):
         self.asm_instructions.append(ASM_Comment(comment=comment,not_tabbed=not_tabbed))
 
@@ -1107,8 +1131,18 @@ class CoolAsmGen:
 
 if __name__ == "__main__":
     file = sys.argv[1]
+
     # open .cl-asm file to write.
     asm_file = file.replace(".cl-type",".cl-asm")
     with open(asm_file,"w") as outfile:
         coolAsmGen = CoolAsmGen(file=file)
-        coolAsmGen.flush_asm(outfile)
+        comments = False
+        debug = False
+        for arg in sys.argv[2:]:
+            if arg == "c":
+                print("comments enabled.")
+                comments = True
+            if arg == "d":
+                print("debug enabled.")
+                debug = True
+        coolAsmGen.flush_asm(outfile,include_comments=comments,debug=debug)

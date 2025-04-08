@@ -1,5 +1,9 @@
 from collections import namedtuple
 
+
+# stop this stack tomfoolery once and for all
+ASM_Debug = namedtuple("ASM_Debug","reg")
+
 # the actual value
 ASM_Value = namedtuple("ASM_Value","value")
 # used instead of ASM_Value when converting from cool 1 word size to arbitrary size (8 in x86)
