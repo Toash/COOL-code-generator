@@ -406,6 +406,10 @@ class CoolAsmGen:
                 else_depth = self.compute_max_stack_depth(Else[1])
                 return max(then_depth, else_depth)
 
+            case While(Predicate,Body):
+                body_depth = self.compute_max_stack_depth(Body[1])
+                return body_depth
+
             case Let(Bindings, Body):
                 total_let_depth = len(Bindings)
                 body_depth = self.compute_max_stack_depth(Body[1])
@@ -582,8 +586,98 @@ class CoolAsmGen:
     generate code for e, put on accumulator register.
     (append instuctions to our asm list)
     leave stack the way we found it
+
+    as_predicate is for conditionals, 
+        if true it will add branching to other lables based on the bool value.
     """
     def cgen(self, exp, as_predicate = False)->None:
+        def gen_dispatch_helper(self, Exp, Method, Args):
+
+            self.debug("sp")
+
+            #save self object and frame pointer to restore later
+            self.append_asm(ASM_Push("fp"))
+            self.append_asm(ASM_Push(self_reg))
+
+            """
+            Here how the stack frame look like:
+            arg 1,
+            arg 2,
+            arg n....
+            receiver object
+            """
+            for arg in Args:
+                self.cgen(arg[1]) # skip line number
+                self.comment("Push argument on the stack.")
+                self.append_asm(ASM_Push(acc_reg))
+
+            if Exp:
+                self.cgen(Exp)
+            else:
+                # object on which current method is invoked.
+                self.comment("Move receiver to accumulator.")
+                self.append_asm(ASM_Mov(acc_reg,self_reg))
+
+            self.comment("Push self receiver on the stack.")
+            self.append_asm(ASM_Push(acc_reg))
+
+
+            """
+            1. load RO (acc) vtable into (temp)
+            2. load the vtable index into (temp2)
+            3. temp <- temp[temp2] -- get method pointer
+            4. call temp
+            """
+            # receiver object in acc.
+            # e.g: someone wants to invoke "out_int" or "main"
+            # emit code to lookup in vtable.
+            self.comment("Loading v table.")
+            self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
+
+            class_name = Exp.Type if Exp else self.current_class
+            method_name = Method.str
+            # This should always access - unless we have a problem.
+            method_vtable_index = self.vtable_method_indexes[(class_name, method_name)]
+            # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
+            self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
+            self.append_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
+            self.comment(f"Indirectly call the method.")
+            self.append_asm(ASM_Call_Reg(temp_reg))
+
+
+            # in cool_asm we are adding to stack pointer in callee
+            # cant do this in x86, the return address is in the way.
+            # so we do it in the caller, where the return address has already been popped off by ret.
+            if self.x86:
+                self.comment(f"x86- clean up stack.")
+                self.append_asm(ASM_Li(temp_reg,ASM_Word(len(Args)+1)))
+                self.append_asm(ASM_Add(temp_reg,"sp"))
+
+            # self.add_asm(ASM_Pop(self_reg))
+            # get back old frame pointer
+            self.append_asm(ASM_Pop(self_reg))
+            self.append_asm(ASM_Pop("fp"))
+
+            # ensure stack integrity
+            self.debug("sp")
+        
+        def gen_predicate(self,predicate):
+            match predicate:
+                case Lt(Left,Right):
+                    self.cgen(Lt(Left,Right,StaticType="Bool"), as_predicate=True)
+                case Le(Left,Right):
+                    self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)
+                case Eq(Left,Right):
+                    self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)
+                case Not(Exp):
+                    self.cgen(Not(Exp,StaticType="Bool"),as_predicate=True)
+                case true(Value):
+                    self.cgen(true(Value,StaticType="Bool"), as_predicate=True)
+                case false(Value):
+                    self.cgen(false(Value,StaticType="Bool"), as_predicate=True)
+                case _:
+                    print("Unhandled predicate:", Predicate)
+        
         self.comment(f"cgen+: {exp}")
 
         # locs = []
@@ -618,9 +712,9 @@ class CoolAsmGen:
 
             # Dispatch
             case Dynamic_Dispatch(Exp,Method,Args):
-                self.gen_dispatch_helper(Exp=Exp, Method=Method, Args=Args)
+                gen_dispatch_helper(self,Exp=Exp, Method=Method, Args=Args)
             case Self_Dispatch(Method,Args):
-                self.gen_dispatch_helper(Exp=None, Method=Method, Args=Args)
+                gen_dispatch_helper(self,Exp=None, Method=Method, Args=Args)
 
             case If(Predicate, Then, Else):
                 self.cond_then_label = "true_" + self.get_branch_label()
@@ -628,21 +722,7 @@ class CoolAsmGen:
                 self.cond_end_label = "end_" + self.get_branch_label()
 
                 # predicate
-                match Predicate[1]:
-                    case Lt(Left,Right):
-                        self.cgen(Lt(Left,Right,StaticType="Bool"), as_predicate=True)
-                    case Le(Left,Right):
-                        self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)
-                    case Eq(Left,Right):
-                        self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)
-                    case Not(Exp):
-                        self.cgen(Not(Exp,StaticType="Bool"),as_predicate=True)
-                    case true(Value):
-                        self.cgen(true(Value,StaticType="Bool"), as_predicate=True)
-                    case false(Value):
-                        self.cgen(false(Value,StaticType="Bool"), as_predicate=True)
-                    case _:
-                       print("Unhandled predicate:", Predicate)
+                gen_predicate(self, Predicate[1])
 
                 # else
                 self.comment("ELSE (False branch)",not_tabbed=True)
@@ -656,11 +736,24 @@ class CoolAsmGen:
                 self.cgen(Then[1])
 
                 # end
-                self.comment("END of if conditional")
+                self.comment("END of if conditional",not_tabbed=True)
                 self.append_asm(ASM_Label(self.cond_end_label))
 
                 # Accumulater will contain the result of either the then or else.
+            
+            case While(Predicate, Body):
+                self.cond_then_label = "while_" + self.get_branch_label()
+                self.cond_end_label = "end_" + self.get_branch_label()
 
+                self.comment("WHILE (conditional)",not_tabbed=True)
+                self.append_asm(ASM_Label(self.cond_then_label))
+                gen_predicate(self, Predicate[1])
+
+                self.comment("WHILE (body)",not_tabbed=True)
+                self.cgen(Body[1])
+
+                self.comment("WHILE (end)",not_tabbed=True)
+                self.append_asm(ASM_Label(self.cond_end_label))
 
             case Block(Body):
                 for exp in Body:
@@ -807,30 +900,11 @@ class CoolAsmGen:
                 self.append_asm(ASM_Push(self_reg))
                 self.append_asm(ASM_Push("fp"))
 
-                left_type =  Left[1].StaticType
-                if(isinstance(Left[1],Integer)):
-                    # create Integer object with raw value inserted.
-                    self.cgen(New(Type= left_type,StaticType=left_type))
-                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Left[1].Integer)))
-                    self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
-                elif(isinstance(Left[1],Identifier)):
-                    self.cgen(Left[1])
-                else:
-                    raise Exception("unhandled operands in bool comparison: ",Left[1])
+                self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
 
-                right_type =  Right[1].StaticType
-                if(isinstance(Right[1],Integer)):
-                    # create Integer object with raw value inserted.
-                    self.cgen(New(Type=right_type, StaticType=right_type))
-                    self.append_asm(ASM_Li(temp_reg,ASM_Value(Right[1].Integer)))
-                    self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
-                elif(isinstance(Right[1],Identifier)):
-                    self.cgen(Right[1])
-                else:
-                    raise Exception("unhandled operands in bool comparison", Right[1])
+                self.cgen(Right[1])
                 self.append_asm(ASM_Push(acc_reg))
-
 
                 self.append_asm(ASM_Push(self_reg))
                 # stack:
@@ -846,6 +920,7 @@ class CoolAsmGen:
                         self.append_asm(ASM_Call_Label("eq_handler"))
                     case _:
                         raise Exception("Unknown conditional expression:", exp)
+
                 if self.x86:
                     self.comment("x86- deallocate two args and self.")
                     self.append_asm(ASM_Li(temp_reg,ASM_Word(3)))
@@ -914,10 +989,10 @@ class CoolAsmGen:
                     var=Var
                 match self.lookup_symbol(var):
                     case Register(reg):
-                        self.comment(f"Found variable in register {reg}")
+                        self.comment(f"Found variable {var} in register {reg}")
                         self.append_asm(ASM_Mov(dest = acc_reg, src = reg))
                     case Offset(reg,offset):
-                        self.comment(f"Found variable in register {reg} at offset {offset}")
+                        self.comment(f"Found variable {var} in register {reg} at offset {offset}")
                         if not self.x86:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                         else:
@@ -936,6 +1011,7 @@ class CoolAsmGen:
                     self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
 
             case false(Value):
+                # is there even a point in code genning this
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 if as_predicate:
                     self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
@@ -963,6 +1039,7 @@ class CoolAsmGen:
             case Let_No_Init(Var,Type):
                 var = Var[1]
                 self.cgen(New(Type=Type.str,StaticType=Type.str))
+                self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
@@ -970,7 +1047,7 @@ class CoolAsmGen:
             case Let_Init(Var,Type,Exp):
                 var = Var[1]
                 self.cgen(Exp[1])
-
+                self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
@@ -1022,76 +1099,6 @@ class CoolAsmGen:
         self.comment(f"cgen-: {type(exp).__name__}")
 
 
-    def gen_dispatch_helper(self, Exp, Method, Args):
-
-        self.debug("sp")
-
-        #save self object and frame pointer to restore later
-        self.append_asm(ASM_Push("fp"))
-        self.append_asm(ASM_Push(self_reg))
-
-        """
-        Here how the stack frame look like:
-        arg 1,
-        arg 2,
-        arg n....
-        receiver object
-        """
-        for arg in Args:
-            self.cgen(arg[1]) # skip line number
-            self.comment("Push argument on the stack.")
-            self.append_asm(ASM_Push(acc_reg))
-
-        if Exp:
-            self.cgen(Exp)
-        else:
-            # object on which current method is invoked.
-            self.comment("Move receiver to accumulator.")
-            self.append_asm(ASM_Mov(acc_reg,self_reg))
-
-        self.comment("Push self receiver on the stack.")
-        self.append_asm(ASM_Push(acc_reg))
-
-
-        """
-        1. load RO (acc) vtable into (temp)
-        2. load the vtable index into (temp2)
-        3. temp <- temp[temp2] -- get method pointer
-        4. call temp
-        """
-        # receiver object in acc.
-        # e.g: someone wants to invoke "out_int" or "main"
-        # emit code to lookup in vtable.
-        self.comment("Loading v table.")
-        self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
-
-        class_name = Exp.Type if Exp else self.current_class
-        method_name = Method.str
-        # This should always access - unless we have a problem.
-        method_vtable_index = self.vtable_method_indexes[(class_name, method_name)]
-        # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
-        self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
-        self.append_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
-        self.comment(f"Indirectly call the method.")
-        self.append_asm(ASM_Call_Reg(temp_reg))
-
-
-        # in cool_asm we are adding to stack pointer in callee
-        # cant do this in x86, the return address is in the way.
-        # so we do it in the caller, where the return address has already been popped off by ret.
-        if self.x86:
-            self.comment(f"x86- clean up stack.")
-            self.append_asm(ASM_Li(temp_reg,ASM_Word(len(Args)+1)))
-            self.append_asm(ASM_Add(temp_reg,"sp"))
-            pass
-
-        # self.add_asm(ASM_Pop(self_reg))
-        # get back old frame pointer
-        self.append_asm(ASM_Pop(self_reg))
-        self.append_asm(ASM_Pop("fp"))
-
-        # ensure stack integrity
-        self.debug("sp")
 
 
     def debug(self,reg):

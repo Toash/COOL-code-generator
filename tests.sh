@@ -4,11 +4,13 @@ TESTS=(
   "arith"
   "assignment"
   "bool_no_let"
+  "bool_let"
   "let_no_init"
   "let_init"
   "unary"
   "scopes"
   "pa3"
+  "while"
 )
 
 GREEN='\033[0;32m'
