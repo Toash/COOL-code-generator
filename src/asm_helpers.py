@@ -144,7 +144,6 @@ def emit_comparison_true(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "le":
         asm_instructions.append(ASM_Label("le_true"))
         asm_instructions.append(ASM_Comment("less than or equal"))
-    asm_instructions.append(ASM_Comment("Just create a bool and set 0 to its raw int."))
     asm_instructions.append(ASM_Push("fp"))
     asm_instructions.append(ASM_Push(self_reg))
     asm_instructions.append(ASM_Call_Label("Bool..new"))

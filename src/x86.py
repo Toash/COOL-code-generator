@@ -73,6 +73,11 @@ class X86Gen:
                 case ASM_Jmp(label):
                     self.tab()
                     self.outfile.write(f"jmp {label}\n")
+                case ASM_Bz(reg, label):
+                    self.tab()
+                    self.outfile.write(f"cmpq $0, {self.get_reg(reg)}\n")
+                    self.tab()
+                    self.outfile.write(f"je {label}\n")
                 case ASM_Bnz(reg, label):
                     self.tab()
                     self.outfile.write(f"cmpq $0, {self.get_reg(reg)}\n")

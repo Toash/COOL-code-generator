@@ -92,9 +92,13 @@ class CoolAsmGen:
         self.emit_vtables()
         self.emit_constructors()
         self.emit_methods()
+
+        # labels for if
         self.cond_then_label = ""
         self.cond_else_label = ""
         self.cond_end_label = ""
+        # label for while
+        self.cond_while_label= ""
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label)
 
@@ -191,6 +195,8 @@ class CoolAsmGen:
 
             case ASM_Jmp(label):
                 return f"jmp {label}"
+            case ASM_Bz(reg,label):
+                return f"bz {reg} {label}"
             case ASM_Bnz(reg,label):
                 return f"bnz {reg} {label}"
             case ASM_Beq(left,right,label):
@@ -586,11 +592,8 @@ class CoolAsmGen:
     generate code for e, put on accumulator register.
     (append instuctions to our asm list)
     leave stack the way we found it
-
-    as_predicate is for conditionals, 
-        if true it will add branching to other lables based on the bool value.
     """
-    def cgen(self, exp, as_predicate = False)->None:
+    def cgen(self, exp)->None:
         def gen_dispatch_helper(self, Exp, Method, Args):
 
             self.debug("sp")
@@ -661,23 +664,6 @@ class CoolAsmGen:
             # ensure stack integrity
             self.debug("sp")
         
-        def gen_predicate(self,predicate):
-            match predicate:
-                case Lt(Left,Right):
-                    self.cgen(Lt(Left,Right,StaticType="Bool"), as_predicate=True)
-                case Le(Left,Right):
-                    self.cgen(Le(Left,Right,StaticType="Bool"), as_predicate=True)
-                case Eq(Left,Right):
-                    self.cgen(Eq(Left,Right,StaticType="Bool"), as_predicate=True)
-                case Not(Exp):
-                    self.cgen(Not(Exp,StaticType="Bool"),as_predicate=True)
-                case true(Value):
-                    self.cgen(true(Value,StaticType="Bool"), as_predicate=True)
-                case false(Value):
-                    self.cgen(false(Value,StaticType="Bool"), as_predicate=True)
-                case _:
-                    print("Unhandled predicate:", Predicate)
-        
         self.comment(f"cgen+: {exp}")
 
         # locs = []
@@ -722,7 +708,9 @@ class CoolAsmGen:
                 self.cond_end_label = "end_" + self.get_branch_label()
 
                 # predicate
-                gen_predicate(self, Predicate[1])
+                self.cgen(Predicate[1])
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
 
                 # else
                 self.comment("ELSE (False branch)",not_tabbed=True)
@@ -742,15 +730,21 @@ class CoolAsmGen:
                 # Accumulater will contain the result of either the then or else.
             
             case While(Predicate, Body):
-                self.cond_then_label = "while_" + self.get_branch_label()
+                self.cond_while_label = "while_predicate_"+ self.get_branch_label()
                 self.cond_end_label = "end_" + self.get_branch_label()
 
                 self.comment("WHILE (conditional)",not_tabbed=True)
-                self.append_asm(ASM_Label(self.cond_then_label))
-                gen_predicate(self, Predicate[1])
+                self.append_asm(ASM_Label(self.cond_while_label))
+                self.cgen(Predicate[1])
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Bz(acc_reg,self.cond_end_label))
+
+
 
                 self.comment("WHILE (body)",not_tabbed=True)
                 self.cgen(Body[1])
+                # go back to conditional ( the looping part )
+                self.append_asm(ASM_Jmp(self.cond_while_label))
 
                 self.comment("WHILE (end)",not_tabbed=True)
                 self.append_asm(ASM_Label(self.cond_end_label))
@@ -929,23 +923,15 @@ class CoolAsmGen:
                 self.append_asm(ASM_Pop("fp"))
                 self.append_asm(ASM_Pop(self_reg))
 
-                # less than handler gave us the bool
-                if as_predicate:
-                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                    self.append_asm(ASM_Bnz(acc_reg, self.cond_then_label))
-
 
             case Not(Exp):
-                self.cgen(Exp[1], as_predicate=False)
+                self.cgen(Exp[1])
                 self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Li(temp2_reg, ASM_Value(1)))
                 self.append_asm(ASM_Sub(temp_reg, temp2_reg))
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 self.append_asm(ASM_St(acc_reg, temp2_reg, attributes_start_index))
 
-                if as_predicate:
-                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                    self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
 
             case Negate(Exp):
                 self.cgen(Exp[1])
@@ -1006,16 +992,10 @@ class CoolAsmGen:
                 self.cgen(New(Type="Bool", StaticType="Bool"))
                 self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
-                if as_predicate:
-                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                    self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
 
             case false(Value):
                 # is there even a point in code genning this
                 self.cgen(New(Type="Bool", StaticType="Bool"))
-                if as_predicate:
-                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                    self.append_asm(ASM_Bnz(acc_reg,self.cond_then_label))
 
 
             case Let(Bindings,Body):
