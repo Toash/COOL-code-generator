@@ -1,12 +1,15 @@
+import sys
 from collections import namedtuple
 from annotated_ast_reader import AnnotatedAstReader
+
 from asm_registers import *
+from asm_constants import *
+
 from ast_nodes import *
 from asm_instructions import *
-from asm_helpers import *
-from asm_constants import *
-import sys
-from pprint import pprint
+
+from asm_comparisons import *
+from asm_strings import * 
 
 
 
@@ -18,22 +21,17 @@ Offset = namedtuple("Offset","reg offset")
 COOL ASM STACK MACHINE CONVENTION:
 
 Calling convention - on function exit, sp is same as it was on entry.
-Need return address (ra)
-pointer to start of current activation (fp)
-
-Note: in cool-asm, stack pointers to unused memory sp[1] is the top of the stack.
-Stack should be the same before and after a method call.
-
-Next address stored in ra
-- pop when calling function
-- after function ends (stack has to be the same),
+- In cool-asm, we add to stack  pointer  (deallocating parameters, receiver object and temporaries) in the function itself.
+    (because the reference compiler does it :/ )
+- in x86, we add to rsp after  the funcdtion caller (from the caller itself).
 
 On function call,
 - push parameters on stack
 - push receiver object.
+- x86 return address  gets pushed as well during call.
 
-Note: return jumps to ra.
-so after function ends (and stack is the same before call, pop ra then return.)
+Note: in cool-asm, return jumps to ra.
+    so after function ends (and stack is the same before call, pop ra then return.)
 """
 
 class CoolAsmGen:
@@ -462,11 +460,11 @@ class CoolAsmGen:
 
             self.push_scope()
 
+            #  FIXME: Fields
             # step 1 - fields / attr in scope
             for index,attr in enumerate(self.class_map[cname],start=1):
                 if index==1:
                     self.comment("Setting up addresses for attributes (based off offsets from self reg)")
-                # FIXME - X86
                 self.comment(f"Setting up attribute, it lives in {self_reg}[{stack_cleanup_size}]")
                 self.insert_symbol(attr.Name , Offset(self_reg, index))
 

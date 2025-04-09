@@ -1,7 +1,7 @@
+import sys
 from asm import CoolAsmGen
 from asm_instructions import *
-import sys
-from pprint import pprint
+from x86_strings import *
 
 
 # given cl-type, parses cl-type, converts to cool-asm, then to x86.
@@ -22,7 +22,15 @@ class X86Gen:
             self.outfile = open(outfile_name,"w")
             self.cool_asm_to_x86(cool_asm_gen.get_asm())
         finally:
-            self.c_placeholders()
+            c_placeholders(self.outfile)
+
+            # out_string
+            emit_cooloutstr_start(self.outfile)
+            emit_cooloutstr_loop_start(self.outfile)
+            emit_print_check_newline(self.outfile)
+            emit_print_check_tab(self.outfile)
+            emit_print(self.outfile)
+
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
             self.outfile.close()
@@ -38,74 +46,74 @@ class X86Gen:
                 case ASM_Li(reg,imm):
                     self.tab()
                     if isinstance(imm,ASM_Value):
-                        self.outfile.write(f"movq ${imm.value}, {self.get_reg(reg)}\n")
+                        self.outfile.write(f"movq\t ${imm.value}, {self.get_reg(reg)}\n")
                     elif isinstance(imm, ASM_Word):
                         
-                        self.outfile.write(f"movq ${int(imm.value) * 8}, {self.get_reg(reg)}\n")
+                        self.outfile.write(f"movq\t ${int(imm.value) * 8}, {self.get_reg(reg)}\n")
                     else:
                         raise Exception("Immediate should be ASM_Value or ASM_Word")
                 case ASM_Mov(dest,src):
                     self.tab()
-                    self.outfile.write(f"movq {self.get_reg(src)}, {self.get_reg(dest)}\n")
+                    self.outfile.write(f"movq\t {self.get_reg(src)}, {self.get_reg(dest)}\n")
 
                 case ASM_Add(left,right):
                     self.tab()
-                    self.outfile.write(f"addq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.outfile.write(f"addq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
                 case ASM_Sub(left,right):
                     self.tab()
-                    self.outfile.write(f"subq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.outfile.write(f"subq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
                 case ASM_Mul(left,right):
                     self.tab()
-                    self.outfile.write(f"imulq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.outfile.write(f"imulq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
                 case ASM_Div(left,right):
                     self.tab()
-                    self.outfile.write(f"movq {self.get_reg(right)}, %rax\n")
+                    self.outfile.write(f"movq\t {self.get_reg(right)}, %rax\n")
                     self.tab()
-                    self.outfile.write(f"movq {self.get_reg(left)}, %rbx\n")
+                    self.outfile.write(f"movq\t {self.get_reg(left)}, %rbx\n")
                     self.tab()
                     # sign extend RAX into RDX:RAX (RDX will be all 1s or 0s)
                     self.outfile.write("cqto\n") 
                     self.tab()
-                    self.outfile.write(f"idivq %rbx\n")
+                    self.outfile.write(f"idivq\t %rbx\n")
                     self.tab()
-                    self.outfile.write(f"movq %rax, {self.get_reg(right)}\n")
+                    self.outfile.write(f"movq\t %rax, {self.get_reg(right)}\n")
 
                 case ASM_Jmp(label):
                     self.tab()
-                    self.outfile.write(f"jmp {label}\n")
+                    self.outfile.write(f"jmp\t {label}\n")
                 case ASM_Bz(reg, label):
                     self.tab()
-                    self.outfile.write(f"cmpq $0, {self.get_reg(reg)}\n")
+                    self.outfile.write(f"cmpq\t $0, {self.get_reg(reg)}\n")
                     self.tab()
-                    self.outfile.write(f"je {label}\n")
+                    self.outfile.write(f"je\t {label}\n")
                 case ASM_Bnz(reg, label):
                     self.tab()
-                    self.outfile.write(f"cmpq $0, {self.get_reg(reg)}\n")
+                    self.outfile.write(f"cmpq\t $0, {self.get_reg(reg)}\n")
                     self.tab()
-                    self.outfile.write(f"jne {label}\n")
+                    self.outfile.write(f"jne\t {label}\n")
                 case ASM_Beq(left, right, label):
                     self.tab()
-                    self.outfile.write(f"cmpq {self.get_reg(left)}, {self.get_reg(right)}\n")
+                    self.outfile.write(f"cmpq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
                     self.tab()
-                    self.outfile.write(f"je {label}\n")
+                    self.outfile.write(f"je\t {label}\n")
                 case ASM_Blt(left,right,label):
                     self.tab()
-                    self.outfile.write(f"cmpq {self.get_reg(right)}, {self.get_reg(left)}\n")
+                    self.outfile.write(f"cmpq\t {self.get_reg(right)}, {self.get_reg(left)}\n")
                     self.tab()
-                    self.outfile.write(f"jl {label}\n")
+                    self.outfile.write(f"jl\t {label}\n")
                 case ASM_Ble(left,right,label):
                     self.tab()
-                    self.outfile.write(f"cmpq {self.get_reg(right)}, {self.get_reg(left)}\n")
+                    self.outfile.write(f"cmpq\t {self.get_reg(right)}, {self.get_reg(left)}\n")
                     self.tab()
-                    self.outfile.write(f"jle {label}\n")
+                    self.outfile.write(f"jle\t {label}\n")
 
 
                 case ASM_Call_Label(label):
                     self.tab()
-                    self.outfile.write(f"call {label}\n")
+                    self.outfile.write(f"call\t {label}\n")
                 case ASM_Call_Reg(reg):
                     self.tab()
-                    self.outfile.write(f"call *{self.get_reg(reg)}\n")
+                    self.outfile.write(f"call\t *{self.get_reg(reg)}\n")
                 case ASM_Return():
                     self.tab()
                     # we need to handle returns differently.
@@ -120,7 +128,7 @@ class X86Gen:
                         continue
 
                     self.tab()
-                    self.outfile.write(f"pushq {self.get_reg(reg)}\n")
+                    self.outfile.write(f"pushq\t {self.get_reg(reg)}\n")
                 case ASM_Pop(reg):
 
                     # x86 already pops return address in call instruction.
@@ -128,18 +136,18 @@ class X86Gen:
                         continue
 
                     self.tab()
-                    self.outfile.write(f"popq {self.get_reg(reg)}\n")
+                    self.outfile.write(f"popq\t {self.get_reg(reg)}\n")
                 case ASM_Ld(dest,src,offset):
                     self.tab()
-                    self.outfile.write(f"movq {offset*8}({self.get_reg(src)}), {self.get_reg(dest)}\n")
+                    self.outfile.write(f"movq\t {offset*8}({self.get_reg(src)}), {self.get_reg(dest)}\n")
                 case ASM_St(dest,src,offset):
                     self.tab()
-                    self.outfile.write(f"movq {self.get_reg(src)}, {offset*8}({self.get_reg(dest)})\n")
+                    self.outfile.write(f"movq\t {self.get_reg(src)}, {offset*8}({self.get_reg(dest)})\n")
                     pass
 
                 case ASM_La(reg,label):
                     self.tab()
-                    self.outfile.write(f"movq ${label}, {self.get_reg(reg)}\n")
+                    self.outfile.write(f"movq\t ${label}, {self.get_reg(reg)}\n")
                     pass
 
                 case ASM_Alloc(dest,src):
@@ -151,10 +159,10 @@ class X86Gen:
                     self.tab()
                     self.outfile.write(f"## --- CALLOC ---\n")
                     self.tab()
-                    self.outfile.write(f"movq %r12, %rdi")
+                    self.outfile.write(f"movq\t %r12, %rdi")
                     self.outfile.write("\t ## first argument - amount of entries\n")
                     self.tab()
-                    self.outfile.write(f"movq ${8}, %rsi")
+                    self.outfile.write(f"movq\t ${8}, %rsi")
                     self.outfile.write("\t ## second argument - size of each entry\n")
 
                     self.tab()
@@ -162,7 +170,7 @@ class X86Gen:
                     
                     self.tab()
                     
-                    self.outfile.write(f"movq %rax, {self.get_reg(dest)}\n")
+                    self.outfile.write(f"movq\t %rax, {self.get_reg(dest)}\n")
                     self.outfile.write("\n")
 
 
@@ -171,53 +179,57 @@ class X86Gen:
                     match name:
                         case "exit":
                             self.tab()
-                            self.outfile.write("movl $0, %edi\n")
+                            self.outfile.write("movl\t $0, %edi\n")
                             self.tab()
-                            self.outfile.write("call exit\n")
+                            self.outfile.write("call\t exit\n")
                         case "IO.out_int":
+                            self.outfile.write("\n")
                             self.tab()
-                            self.outfile.write("movq $percent.d, %rdi\n")
+                            self.outfile.write("## out_int\n")
+                            self.tab()
+                            self.outfile.write("movq\t $percent.d, %rdi\n")
                             
                             self.tab()
-                            self.outfile.write("movl %eax, %eax ## truncate higher 32 bits\n")
+                            self.outfile.write("movl\t %eax, %eax ## truncate higher 32 bits\n")
                             self.tab()
                             self.outfile.write("cdqe\t## sign extend the 32 bit integer\n")
                             
                             self.tab()
                             # accumulator should hold the value we want to print.
-                            self.outfile.write("movq %r13, %rsi\n")
+                            self.outfile.write("movq\t %r13, %rsi\n")
                             self.tab()
-                            self.outfile.write("movl $0, %eax\t## required by printf.\n")
+                            self.outfile.write("movl\t $0, %eax\t## required by printf.\n")
                             self.tab()
-                            self.outfile.write("call printf\n")
+                            self.outfile.write("call\t printf\n")
                         case "IO.in_int":
+                            self.outfile.write("\n")
                             self.tab()
-                            self.outfile.write("## start of in_int\n")
+                            self.outfile.write("## in_int\n")
                             self.tab()
-                            self.outfile.write("movl $1, %esi\n")
+                            self.outfile.write("movl\t $1, %esi\n")
                             self.tab()
-                            self.outfile.write("movl $4096, %edi\n")
+                            self.outfile.write("movl\t $4096, %edi\n")
                             
                             self.tab()
                             self.outfile.write("## Generate array of 4096 chars\n")
 
                             self.tab()
                             # generate array of 4096 characters where string will be stored.
-                            self.outfile.write("call calloc\n")
+                            self.outfile.write("call\t calloc\n")
                             self.tab()
-                            self.outfile.write("pushq %rax\n")
+                            self.outfile.write("pushq\t %rax\n")
                             # im starting to regret these tabs
                             self.tab()
-                            self.outfile.write("movq %rax, %rdi\n")
+                            self.outfile.write("movq\t %rax, %rdi\n")
                             self.tab()
-                            self.outfile.write("movq $4096, %rsi\n")
+                            self.outfile.write("movq\t $4096, %rsi\n")
                             self.tab()
 
                             self.outfile.write("## put stdin stream into %rdx.\n")
 
                             self.tab()
                             # the stream
-                            self.outfile.write("movq stdin(%rip), %rdx\n")
+                            self.outfile.write("movq\t stdin(%rip), %rdx\n")
                             
                             self.tab()
                             self.outfile.write("## fgets has\n")
@@ -228,23 +240,23 @@ class X86Gen:
                             self.tab()
                             self.outfile.write("## rdx - the stream to read from (stdin)\n")
                             self.tab()
-                            self.outfile.write("call fgets\n")
+                            self.outfile.write("call\t fgets\n")
 
                             self.tab()
-                            self.outfile.write("popq %rdi\n")
+                            self.outfile.write("popq\t %rdi\n")
                             self.tab()
-                            self.outfile.write("movl $0, %eax\n")
+                            self.outfile.write("movl\t $0, %eax\n")
                             self.tab()
-                            self.outfile.write("pushq %rax\n")
+                            self.outfile.write("pushq\t %rax\n")
                             self.tab()
 
                             # sscanf will write to top of stack.
                             self.outfile.write("## sscanf will write to top of stack.\n")
 
                             self.tab()
-                            self.outfile.write("movq %rsp, %rdx\n")
+                            self.outfile.write("movq\t %rsp, %rdx\n")
                             self.tab()
-                            self.outfile.write("movq $percent.ld, %rsi\n")
+                            self.outfile.write("movq\t $percent.ld, %rsi\n")
 
                             # with the ld placeholder, only parse an integer from the input string.
                             self.tab()
@@ -261,41 +273,46 @@ class X86Gen:
 
 
                             self.tab()
-                            self.outfile.write("call sscanf\n")
+                            self.outfile.write("call\t sscanf\n")
                             self.tab()
                             # inputted integer now in rax.
-                            self.outfile.write("popq %rax\n")
+                            self.outfile.write("popq\t %rax\n")
                             self.tab()
-                            self.outfile.write("movq $0, %rsi\n")
+                            self.outfile.write("movq\t $0, %rsi\n")
                             self.tab()
                             # clamp to 32 bit signed int range.
-                            self.outfile.write("cmpq $2147483647, %rax\n")
+                            self.outfile.write("cmpq\t $2147483647, %rax\n")
                             self.tab()
-                            self.outfile.write("cmovg %rsi, %rax\n")
+                            self.outfile.write("cmovg\t %rsi, %rax\n")
                             self.tab()
-                            self.outfile.write("cmpq $-2147483648, %rax\n")
+                            self.outfile.write("cmpq\t $-2147483648, %rax\n")
                             self.tab()
-                            self.outfile.write("cmovl %rsi, %rax\n")
+                            self.outfile.write("cmovl\t %rsi, %rax\n")
                             self.tab()
-                            self.outfile.write("movq %rax, %r13\n")
+                            self.outfile.write("movq\t %rax, %r13\n")
                             self.tab()
                             self.outfile.write("## we now have the raw value in %r13.\n")
                         case "IO.out_string":
-                            # self.tab()
-                            # self.outfile.write("call cooloutstr\n")
-
-                            pass
+                            self.outfile.write("\n")
+                            self.tab()
+                            self.outfile.write("## out_string\n")
+                            self.tab()
+                            self.outfile.write("movq\t %r13, %rdi ## move string pointer (just raw value in a String object) to rdi.\n")
+                            self.tab()
+                            self.outfile.write("call\t cooloutstr\n")
                         case _:
                             self.tab()
                             raise Exception("Implement system call for ",name)
                             # self.outfile.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):
-                    self.tab()
                     for char in string:
-                        self.outfile.write(f".byte {ord(char)}\n")
+                        self.tab()
+                        self.outfile.write(f".byte\t {ord(char)} \t ## \"{char}\"\n")
+                    self.tab()
+                    self.outfile.write(f".byte\t 0 ## null char\n")
                 case ASM_Constant_label(label):
                     self.tab()
-                    self.outfile.write(f".quad {label}\n")
+                    self.outfile.write(f".quad\t {label}\n")
                 case ASM_Comment(comment,not_tabbed):
                     # lol
                     if not not_tabbed:
@@ -323,32 +340,12 @@ class X86Gen:
             "sp":"%rsp",
         }[reg]
 
+    def write(self,string,not_tabbed = False):
+        if not_tabbed:
+            self.outfile.write(string)
+        else:
+            self.outfile.write("\t\t" + string)
 
-    # used when passing into printf.
-    def c_placeholders(self):
-        # integer
-        self.outfile.write("percent.d:\n")
-        self.tab()
-        self.outfile.write(".byte 37 \t# '%'\n")
-        self.tab()
-        self.outfile.write(".byte 108 \t# 'l'\n")
-        self.tab()
-        self.outfile.write(".byte 100 \t# 'd'\n")
-        self.tab()
-        self.outfile.write(".byte 0\n")
-
-        # long integer
-        self.outfile.write("percent.ld:\n")
-        self.tab()
-        self.outfile.write(".byte 32 \t# ' '\n")
-        self.tab()
-        self.outfile.write(".byte 37 \t# '%'\n")
-        self.tab()
-        self.outfile.write(".byte 108 \t# 'l'\n")
-        self.tab()
-        self.outfile.write(".byte 100 \t# 'd'\n")
-        self.tab()
-        self.outfile.write(".byte 0\n")
         
 
 

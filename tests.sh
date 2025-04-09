@@ -11,6 +11,7 @@ TESTS=(
   "scopes"
   "pa3"
   "while"
+  "string"
 )
 
 GREEN='\033[0;32m'
