@@ -211,6 +211,7 @@ class AnnotatedAstReader:
         body = self.read_exp()
         self.imp_map[(class_name, method_name)].append(body)
 
+    # get non inherited methods
     def get_direct_methods(self):
         self.direct_methods = {}
         for class_name in self.class_map:

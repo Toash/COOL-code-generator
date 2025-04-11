@@ -263,11 +263,11 @@ class CoolAsmGen:
             self.vtable_method_indexes[(cls, "new")] = index
             index += 1
 
+
             # inherited methods
             for (class_name,method_name), imp in self.imp_map.items():
 
                 exp = imp[-1][1] # skip over formals and line number
-                # FIXME: This is probably not handling inheritance for non internals.
                 if type(exp).__name__ == "Internal":
                     if cls == class_name:
                         # body contaisn a string for the actual class and method called.
@@ -276,7 +276,17 @@ class CoolAsmGen:
                         index += 1
                 else:
                     if cls == class_name:
-                        self.append_asm(ASM_Constant_label(label=f"{class_name}.{method_name}"))
+                        # get the most recent implementation
+                        direct_class = class_name
+                        while direct_class:
+                            # found the most recent implementation
+                            if (direct_class, method_name) in self.direct_methods:
+                                break;
+                            else:
+                                # go up the inheritance tree
+                                direct_class = self.parent_map[direct_class]
+
+                        self.append_asm(ASM_Constant_label(label=f"{direct_class}.{method_name}"))
                         # self.vtable_method_indexes[(class_name, method_name)] = index
                         self.vtable_method_indexes[(class_name, method_name)] = index
                         index+=1
@@ -593,6 +603,9 @@ class CoolAsmGen:
                 self.comment("Push argument on the stack.")
                 self.append_asm(ASM_Push(acc_reg))
 
+            # If Exp is tuple then we gotta skip the line number
+            if isinstance(Exp,tuple):
+                Exp = Exp[1]
             if Exp:
                 self.cgen(Exp)
             else:
@@ -616,11 +629,18 @@ class CoolAsmGen:
             self.comment("Loading v table.")
             self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
 
-            class_name = Exp.Type if Exp else self.current_class
+
+            if Exp: 
+                # If Exp is tuple then we gotta skip the line number
+                if isinstance(Exp.Type, tuple):
+                    receiver_type = Exp.Type[1]
+                else:
+                    receiver_type = Exp.Type
+
+            class_name = receiver_type if Exp else self.current_class
             method_name = Method.str
-            # This should always access - unless we have a problem.
             method_vtable_index = self.vtable_method_indexes[(class_name, method_name)]
-            # self.add_asm(ASM_Li(temp2_reg,method_vtable_index))
+
             self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
             self.append_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
             self.comment(f"Indirectly call the method.")
@@ -735,6 +755,8 @@ class CoolAsmGen:
             # acc will contain the last result of the entire block.
 
             case New(Type):
+                if isinstance(Type,ID):
+                    Type = Type[1]
                 self.append_asm(ASM_Push("fp"))
                 self.append_asm(ASM_Push(self_reg))
                 # going to put result in ra register.

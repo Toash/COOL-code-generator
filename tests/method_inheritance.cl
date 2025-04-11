@@ -1,4 +1,3 @@
-
 class Parent inherits IO{
     print():Object{
         out_string("Inherited!\n")

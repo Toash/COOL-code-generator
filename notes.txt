@@ -57,3 +57,11 @@ Register usage
 
 
 Type tags used to determine types when doing equality comparisons.
+
+Bool - 0
+Int - 1
+String - 3
+IO - 10
+Main - 11
+Object - 12
+Printer - 13

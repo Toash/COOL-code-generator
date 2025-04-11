@@ -14,6 +14,9 @@ TESTS=(
   "string"
   "THE_ULTIMATE_TEST"
   "attributes"
+  "methods"
+  "method_other_class"
+  "method_inheritance"
 )
 
 GREEN='\033[0;32m'
@@ -41,5 +44,6 @@ for test in "${TESTS[@]}"; do
   echo
 done
 
+rm my_out
 rm my_output.txt
 rm ref_output.txt
