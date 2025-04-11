@@ -17,6 +17,7 @@ TESTS=(
   "methods"
   "method_other_class"
   "method_inheritance"
+  "method_overriding"
 )
 
 GREEN='\033[0;32m'

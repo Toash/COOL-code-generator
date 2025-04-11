@@ -13,6 +13,9 @@ class Bazz inherits Foo{
 
 class Main{
     main(): Object {
-        
+        {
+            (new Foo).print(); 
+            (new Bazz).print(); 
+        }
     };
 };

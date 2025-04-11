@@ -229,8 +229,6 @@ class AnnotatedAstReader:
                 if not inherited:
                     self.direct_methods[(cls,method)] = imp
 
-
-
     def read_parent_map(self):
         self.read()
         num_relations = self.read()

@@ -124,6 +124,7 @@ class CoolAsmGen:
 
 
         self.emit_start()
+        
 
 
     def get_asm(self,include_comments = False) -> list[namedtuple]:
@@ -276,17 +277,8 @@ class CoolAsmGen:
                         index += 1
                 else:
                     if cls == class_name:
-                        # get the most recent implementation
-                        direct_class = class_name
-                        while direct_class:
-                            # found the most recent implementation
-                            if (direct_class, method_name) in self.direct_methods:
-                                break;
-                            else:
-                                # go up the inheritance tree
-                                direct_class = self.parent_map[direct_class]
 
-                        self.append_asm(ASM_Constant_label(label=f"{direct_class}.{method_name}"))
+                        self.append_asm(ASM_Constant_label(label=f"{class_name}.{method_name}"))
                         # self.vtable_method_indexes[(class_name, method_name)] = index
                         self.vtable_method_indexes[(class_name, method_name)] = index
                         index+=1
@@ -434,7 +426,9 @@ class CoolAsmGen:
     def emit_methods(self)->None:
         self.comment("METHODS",not_tabbed=True)
 
-        for (cname,mname), imp in self.direct_methods.items():
+
+        # for (cname,mname), imp in self.direct_methods.items():
+        for (cname,mname), imp in self.imp_map.items():
             self.current_class = cname
             num_args = len(imp)-1
             exp = imp[-1][1]
