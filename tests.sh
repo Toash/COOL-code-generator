@@ -12,6 +12,7 @@ TESTS=(
   "pa3"
   "while"
   "string"
+  "THE_ULTIMATE_TEST"
 )
 
 GREEN='\033[0;32m'

@@ -253,6 +253,10 @@ class CoolAsmGen:
             index = 0
             self.append_asm(ASM_Label(label = f"{cls}..vtable"))
 
+            # FIXME: cl-asm prints constant to class name why?
+
+
+
             constant_constructor = f"{cls}..new"
             self.append_asm(ASM_Constant_label(label= constant_constructor))
             self.vtable_method_indexes[(cls, "new")] = index
@@ -1114,8 +1118,11 @@ class CoolAsmGen:
         return f"branch_{self.branch_counter}"
 
     def insert_to_string_label(self,string):
-        self.string_label_counter+=1
-        self.string_to_label[string] = f"string{self.string_label_counter}"
+        if string in self.string_to_label:
+            return
+        else:
+            self.string_label_counter+=1
+            self.string_to_label[string] = f"string{self.string_label_counter}"
 
 
 if __name__ == "__main__":
