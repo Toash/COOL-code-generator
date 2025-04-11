@@ -24,6 +24,7 @@ Calling convention - on function exit, sp is same as it was on entry.
 - In cool-asm, we add to stack  pointer  (deallocating parameters, receiver object and temporaries) in the function itself.
     (because the reference compiler does it :/ )
 - in x86, we add to rsp after  the funcdtion caller (from the caller itself).
+- the cool-asm reference compilter needs to add one to temporaries becauase it pops r0.
 
 On function call,
 - push parameters on stack
@@ -409,6 +410,12 @@ class CoolAsmGen:
             case Block(Body):
                 return max(self.compute_max_stack_depth(e[1]) for e in Body)
 
+            case Let(Bindings, Body):
+                binding_depth = len(Bindings)
+                # recursively calculate depth of body while adding binding_depth
+                total_depth = binding_depth+ self.compute_max_stack_depth(Body[1])
+                return total_depth        
+
             case If(Predicate, Then, Else):
                 then_depth = self.compute_max_stack_depth(Then[1])
                 else_depth = self.compute_max_stack_depth(Else[1])
@@ -417,11 +424,6 @@ class CoolAsmGen:
             case While(Predicate,Body):
                 body_depth = self.compute_max_stack_depth(Body[1])
                 return body_depth
-
-            case Let(Bindings, Body):
-                total_let_depth = len(Bindings)
-                body_depth = self.compute_max_stack_depth(Body[1])
-                return max(total_let_depth, body_depth)
 
             case Assign():
                 return 0
@@ -519,21 +521,19 @@ class CoolAsmGen:
             # self.append_asm(ASM_Ld(self_reg,"sp",1))
             self.append_asm(ASM_Pop(self_reg))
 
+            # --=-=-=-=-=-=- temporaries -==-==-=-=-=--=-=-
             # we use positive indicies to refer to variables pushed by the caller
             #   (functoin args, self object)
 
             # we use negative indices to refer to temporaries in the current procedures.
             #   ( let bindings , etc.)
-
             self.append_asm(ASM_Comment("Stack room for temporaries"))
             self.temporaries_needed= self.compute_max_stack_depth(exp)
-
-            # i have no idea why this doesnt work without +1....
+            # we need to do +1 beacuse we popped r0, the reference compiler is confusing... probably shouldn't have followed it
             self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed+1)))
             self.append_asm(ASM_Sub(temp_reg,"sp"))
 
             self.append_asm(ASM_Push("ra"))
-
 
         else:
             # the x86 way
@@ -545,13 +545,10 @@ class CoolAsmGen:
             # +1 for the actual self object that we are getting
             self.append_asm(ASM_Ld(self_reg,"sp",2))
 
-
-            # alignment padding
-            # this is important
-            self.comment("16 byte alignment padding")
-            self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
+            self.comment("Temporaries")
+            self.temporaries_needed= self.compute_max_stack_depth(exp)
+            self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed)))
             self.append_asm(ASM_Sub(temp_reg,"sp"))
-
 
 
     def emit_function_epilogue(self,num_args) -> None:

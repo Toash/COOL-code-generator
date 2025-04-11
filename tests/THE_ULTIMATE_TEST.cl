@@ -108,8 +108,32 @@ class Main inherits IO{
             let x:Int <- 1 in
             {
                 x<-1337;
+                let y:Int <- 2 in 
+                {
+                    out_int(y);
+                    out_int(x);
+                    x<-420;
+                    out_int(x);
+                };
                 out_int(x);
             };
+            out_string("\n\n");
+
+            -- lets
+            out_string("lets:\n");
+
+            let x:Int in
+            let x:Int in
+            let x:Int in
+            let x:Int in
+            out_int(x);
+            
+            let x:Int <- 1 in
+            let x:Int <- 2 in
+            let x:Int <- 3 in
+            let x:Int <- 4 in
+            out_int(x);
+
             out_string("\n\n");
         }
     };
