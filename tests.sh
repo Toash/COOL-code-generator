@@ -13,6 +13,7 @@ TESTS=(
   "while"
   "string"
   "THE_ULTIMATE_TEST"
+  "attributes"
 )
 
 GREEN='\033[0;32m'

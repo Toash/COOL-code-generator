@@ -448,10 +448,10 @@ class CoolAsmGen:
 
             #  FIXME: Fields
             # step 1 - fields / attr in scope
-            for index,attr in enumerate(self.class_map[cname],start=1):
-                if index==1:
+            for index,attr in enumerate(self.class_map[cname],start=attributes_start_index):
+                if index==attributes_start_index:
                     self.comment("Setting up addresses for attributes (based off offsets from self reg)")
-                self.comment(f"Setting up attribute, it lives in {self_reg}[{stack_cleanup_size}]")
+                self.comment(f"Setting up attribute, it lives in {self_reg}[{index}]")
                 self.insert_symbol(attr.Name , Offset(self_reg, index))
 
             # step 2 - formals in scope
