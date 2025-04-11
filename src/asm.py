@@ -349,46 +349,26 @@ class CoolAsmGen:
             self.append_asm(ASM_La(temp_reg, f"{cls}..vtable"))
             self.append_asm(ASM_St(self_reg, temp_reg, vtable_index))
 
-            # default initializers
-            if attrs:
-                self.comment("Attributes - default allocation")
-            for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
 
-                # we are in Int Class.
-                # we need to store the raw int value in an attribute.
-                if attr.Type == "Unboxed_Int":
-                    self.comment(f"Store raw int {0} for attribute in Int.")
-                    self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
-                elif attr.Type == "Unboxed_String":
-                    self.comment(f"Store raw string for attribute in String.")
-                    self.append_asm(ASM_La(acc_reg,"the.empty.string"))
-                else:
-                    self.comment(f"Create new object for {attr.Type}")
-                    self.cgen(New(Type=attr.Type,StaticType=attr.Type))
-                # store attribute in allocated self object.
+            # Attributes
+            for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
+                if not attr.Initializer: 
+                    if attr.Type == "Unboxed_Int":
+                        self.comment(f"Store raw int {0} for attribute in Int.")
+                        self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
+                    elif attr.Type == "Unboxed_String":
+                        self.comment(f"Store raw string for attribute in String.")
+                        self.append_asm(ASM_La(acc_reg,"the.empty.string"))
+                    else:
+                        self.cgen(New(Type=attr.Type, StaticType=attr.Type))
+                elif attr.Initializer:   
+                    exp = attr.Initializer[1]
+                    self.cgen(exp)
+
+                # Attribute in acc
                 self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
 
 
-            # explicit initializers.
-            if attrs:
-                self.comment("Initializers- overwriting attributes where initializers are defined.")
-            for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
-                if attr.Type == "Unboxed_Int":
-                    continue # already initialized this to 0.
-                if attr.Type == "Unboxed_String":
-                    continue # already initialized this to empty string.
-                if not attr.Initalizer:
-                    continue
-
-                exp = attr.Initializer[1]
-                # generate code for the initializer and put it in r1 (accumulator)
-                self.cgen(exp)
-                # store the result of cgen in an attribute slot.
-                self.comment(f"Initialized {attr}")
-                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
-
-
-            self.comment("As promised, store the new object into the accumulator.")
             self.append_asm(ASM_Mov(acc_reg,self_reg))
 
 

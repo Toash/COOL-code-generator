@@ -1,9 +1,6 @@
 class Main inherits IO{
+    a:Int <- 1;
     main(): Object {
-        let x:Int,y:Int in
-        let x:Int in
-        let x:Int in
-        let x:Int in
-        out_int(x)
+        out_int(a)
     };
 };
