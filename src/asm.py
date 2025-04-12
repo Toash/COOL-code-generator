@@ -1051,7 +1051,26 @@ class CoolAsmGen:
                         # x86: rax contains combined string
                         self.append_asm(ASM_St(temp2_reg,acc_reg,attributes_start_index))
                         self.append_asm(ASM_Mov(acc_reg,temp2_reg))
-                     
+                    case "String.substr":
+                        self.cgen(New(Type="String",StaticType="String"))
+                        self.append_asm(ASM_Mov(temp2_reg,acc_reg))
+
+                        # starting int
+                        self.cgen(Identifier(Var="l",StaticType="String"))
+                        self.append_asm(ASM_Mov(temp_reg,acc_reg))
+                        self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+
+                        # ending int 
+                        self.cgen(Identifier(Var="i",StaticType="String"))
+                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+
+                        self.append_asm(ASM_Ld(self_reg,self_reg,attributes_start_index))
+
+                        self.append_asm(ASM_Syscall(Body))
+                        
+                        # in x86 - need to move  rax to acc.
+                        self.append_asm(ASM_St(temp2_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Mov(acc_reg,temp2_reg))
 
                     case _:
                         # raise Exception("Unhandled internal method: ", Body)

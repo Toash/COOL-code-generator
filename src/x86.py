@@ -239,7 +239,8 @@ class X86Gen:
 
                             # modify the combined stinrg we made earlier.
                             self.write("movq\t %rax, %r13\n")
-
+                        case "String.substr":
+                            pass
                         case _:
                             self.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):
