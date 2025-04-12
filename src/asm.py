@@ -52,6 +52,8 @@ class CoolAsmGen:
         self.cond_while_label= ""
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict())
+        emit_dispatch_on_void(self.asm_instructions)
+        emit_substr_out_of_range(self.asm_instructions)
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
@@ -1067,7 +1069,17 @@ class CoolAsmGen:
                         self.append_asm(ASM_Ld(self_reg,self_reg,attributes_start_index))
 
                         self.append_asm(ASM_Syscall(Body))
-                        
+
+                        valid_substr_label = "substr_valid_" + self.get_branch_label()
+                        self.append_asm(ASM_Bnz(acc_reg,valid_substr_label))
+
+
+                        # bad
+                        self.append_asm(ASM_La(acc_reg,"substr_bad"))
+                        self.append_asm(ASM_Syscall("IO.out_string"))
+                        self.append_asm(ASM_Syscall("exit"))
+
+                        self.append_asm(ASM_Label(valid_substr_label))
                         # in x86 - need to move  rax to acc.
                         self.append_asm(ASM_St(temp2_reg,acc_reg,attributes_start_index))
                         self.append_asm(ASM_Mov(acc_reg,temp2_reg))

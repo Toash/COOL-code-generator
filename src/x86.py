@@ -258,8 +258,11 @@ class X86Gen:
                             self.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):
                     for char in string:
-                        self.write(f".byte\t {ord(char)} \t ## \"{char}\"\n")
-                    self.write(f".byte\t 0 ## null char\n")
+                        self.write(f".byte\t {ord(char)} \t ")
+                        self.write(fr"## " + repr(char))
+
+                        self.write("\n")
+                    self.write(f".byte\t 0 \t ## null char\n")
                 case ASM_Constant_label(label):
                     self.write(f".quad\t {label}\n")
                 case ASM_Comment(comment,not_tabbed):

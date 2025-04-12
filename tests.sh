@@ -12,6 +12,7 @@ TESTS=(
   "pa3"
   "while"
   "string"
+  "string_out_of_range"
   "THE_ULTIMATE_TEST"
   "attributes"
   "methods"

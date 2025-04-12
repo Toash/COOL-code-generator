@@ -26,13 +26,13 @@ def c_placeholders(outfile):
     write(outfile,".byte 100 \t# 'd'")
     write(outfile,".byte 0")
     
- 
+
 # loads string pointer into offset from rbp,
 #   string pointer should be at rdi. 
 
 # initializes loop index and jumps to loop start.
 def emit_cooloutstr_start(outfile):
-    write(outfile,".globl cooloutstr", not_tabbed  = True)
+    # write(outfile,".globl cooloutstr", not_tabbed  = True)
     # metadata for assembler
     # write(outfile,".type\tcooloutstr, @function")
     write(outfile,"cooloutstr:", not_tabbed  = True)
@@ -197,7 +197,7 @@ def emit_cooloutstr_print(outfile):
 
 
 def emit_coolstrlen_start(outfile): 
-    write(outfile,".globl coolstrlen",not_tabbed=True)
+    # write(outfile,".globl coolstrlen",not_tabbed=True)
     write(outfile,"coolstrlen:",not_tabbed=True)
     write(outfile,"coolstrlen_start:",not_tabbed=True)
     write(outfile,"pushq\t %rbp")
@@ -251,7 +251,7 @@ def emit_cat_placeholders(outfile):
     write(outfile,".text")
 
 def emit_coolstrcat_start(outfile):
-    write(outfile,".globl coolstrcat",True)
+    # write(outfile,".globl coolstrcat",True)
     write(outfile,"coolstrcat:",True)
     write(outfile,"coolstrcat_start:",True)
     write(outfile,"pushq\t %rbp")
@@ -323,7 +323,7 @@ def emit_coolstrcat_return(outfile):
     write(outfile,"ret")
 
 def emit_coolsubstr_start(outfile):
-    write(outfile,".globl coolsubstr",True)
+    # write(outfile,".globl coolsubstr",True)
     write(outfile,"coolsubstr:",True)
     write(outfile,"coolsubstr_start:",True)
     write(outfile,"pushq\t %rbp")
