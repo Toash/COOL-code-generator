@@ -10,33 +10,28 @@ from asm_strings import *
 from asm_symbol_stack import *
 from asm_locations import *
 from asm_method_index import *
+from asm_string_to_label import *
 
 class CoolAsmGen:
     def __init__(self, file, x86=False):
+        parser = AnnotatedAstReader(file)
+        self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
+
         self.x86=x86
         self.asm_instructions = [] # cool assembly emitted here.
 
         self.symbol_stack = SymbolStack()
         self.method_index = MethodIndex()
+        self.string_to_label = StringToLabel(self.class_map)
+
         self.temporaries_needed= 0
         self.temporary_index = 0
 
-
-
-        # keep track of current_class for self_dispatch.
-        # because we need the type to call the constructor.
         self.current_class = None
 
-        # counter for unique labels
-        self.branch_counter = 0
+        self.branch_counter = 0 # unique labels
 
-        # maps strings to the labels that contain the allocated memory.
-        self.string_label_counter = 0
-        self.string_to_label = {}
 
-        # parse .cl-type, get information
-        parser = AnnotatedAstReader(file)
-        self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
 
         # Internal attributes
         # we done specify initializer as we handle them ourselves.
@@ -44,10 +39,6 @@ class CoolAsmGen:
         # bool also holds a raw int like the Int object.
         self.class_map["Bool"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
         self.class_map["String"].append(Attribute(Name="val",Type="Unboxed_String", Initializer=None))
-
-        # populate string to labels mapping:
-        for class_name in self.class_map:
-            self.insert_to_string_label(class_name)
 
         self.emit_vtables()
         self.emit_constructors()
@@ -60,7 +51,7 @@ class CoolAsmGen:
         # label for while
         self.cond_while_label= ""
 
-        emit_string_constants(self.asm_instructions,x86,self.string_to_label)
+        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict())
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
@@ -907,11 +898,11 @@ class CoolAsmGen:
 
                 # add to string label map
                 # so that we allocate some memory in our assembly program.
-                self.insert_to_string_label(val)
+                self.string_to_label.insert(val)
 
                 # load that label into the string object we created.
-                self.comment(f"\"{val}\" points to label {self.string_to_label[val]}")
-                self.append_asm(ASM_La(temp_reg,self.string_to_label[val]))
+                self.comment(f"\"{val}\" points to label {self.string_to_label.get(val)}")
+                self.append_asm(ASM_La(temp_reg,self.string_to_label.get(val)))
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
 
 
@@ -1041,13 +1032,6 @@ class CoolAsmGen:
     def get_branch_label(self):
         self.branch_counter+=1
         return f"branch_{self.branch_counter}"
-
-    def insert_to_string_label(self,string):
-        if string in self.string_to_label:
-            return
-        else:
-            self.string_label_counter+=1
-            self.string_to_label[string] = f"string{self.string_label_counter}"
 
 
 if __name__ == "__main__":

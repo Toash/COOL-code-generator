@@ -1,5 +1,5 @@
 """
-Gives indicies more methods in the vtable for each class :)
+Gives indicies for methods in the vtable for each class :)
 """
 class MethodIndex:
     def __init__(self):
