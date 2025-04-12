@@ -9,6 +9,10 @@ class Main inherits IO{
                 out_string("\n");
                 out_string(x.concat(y));
                 out_string("\n");
+                out_string(y.substr(0,4));
+                out_string("\n");
+                out_string(x.substr(1,3));
+                out_string("\n");
             };
         }
     };

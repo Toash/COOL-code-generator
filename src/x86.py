@@ -42,6 +42,11 @@ class X86Gen:
             emit_coolstrcat_concat(self.outfile)
             emit_coolstrcat_return(self.outfile)
 
+            emit_coolsubstr_start(self.outfile)
+            emit_coolsubstr_null(self.outfile)
+            emit_coolsubstr_substr(self.outfile)
+            emit_coolsubstr_end(self.outfile)
+
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
             self.outfile.close()
@@ -240,7 +245,15 @@ class X86Gen:
                             # modify the combined stinrg we made earlier.
                             self.write("movq\t %rax, %r13\n")
                         case "String.substr":
-                            pass
+                            # self
+                            self.write("movq\t %r12, %rdi\n")
+                            # starting index
+                            self.write("movq\t %r13, %rsi\n")
+                            # ending index
+                            self.write("movq\t %r14, %rdx\n")
+                            self.write("call\t coolsubstr\n")
+                            self.write("movq\t %rax, %r13\n")
+
                         case _:
                             self.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):

@@ -322,6 +322,64 @@ def emit_coolstrcat_return(outfile):
     write(outfile,"leave")
     write(outfile,"ret")
 
+def emit_coolsubstr_start(outfile):
+    write(outfile,".globl coolsubstr",True)
+    write(outfile,"coolsubstr:",True)
+    write(outfile,"coolsubstr_start:",True)
+    write(outfile,"pushq\t %rbp")
+    write(outfile,"movq\t %rsp, %rbp")
+    write(outfile,"subq\t $48, %rsp")
+
+    # the string
+    write(outfile,"movq\t %rdi, -24(%rbp)")
+    # starting index
+    write(outfile,"movq\t %rsi, -32(%rbp)")
+    # ending index
+    write(outfile,"movq\t %rdx, -40(%rbp)")
+
+    write(outfile,"movq\t -24(%rbp), %rax")
+    write(outfile,"movq\t %rax, %rdi")
+    write(outfile,"call\t coolstrlen")
+    write(outfile,"movl\t %eax, -4(%rbp)")
+    write(outfile,"cmpq\t $0, -32(%rbp)")
+    write(outfile,"js\t coolsubstr_null")
+    write(outfile,"cmpq\t $0, -40(%rbp)")
+    write(outfile,"js\t coolsubstr_null")
+
+    write(outfile,"movq\t -40(%rbp), %rax")
+    write(outfile,"movq\t -32(%rbp), %rdx")
+    # add ending index to starting index
+    write(outfile,"addq\t %rax, %rdx")
+    write(outfile,"movl\t -4(%rbp), %eax")
+    write(outfile,"cltq")
+    # compare length of string with addition of starting and ending index
+    write(outfile,"cmpq\t %rax, %rdx")
+    write(outfile,"jle coolsubstr_substr")
+
+def emit_coolsubstr_null(outfile):
+    write(outfile,"coolsubstr_null:",True)
+    write(outfile,"movl\t $0, %eax")
+    write(outfile,"jmp\t coolsubstr_end")
+
+def emit_coolsubstr_substr(outfile):
+    write(outfile,"coolsubstr_substr:",True)
+    write(outfile,"movq\t -40(%rbp), %rdx")
+    write(outfile,"movq\t -32(%rbp), %rax")
+    # skip chars based on the  first number.
+    # each char is 1 byte.
+    write(outfile,"addq\t -24(%rbp), %rax")
+    write(outfile,"movq\t %rdx, %rsi")
+    write(outfile,"movq\t %rax, %rdi")
+    write(outfile,"call\t strndup")
+    
+
+def emit_coolsubstr_end(outfile):
+    write(outfile,"coolsubstr_end:",True)
+    write(outfile,"leave")
+    write(outfile,"ret")
+
+
+
 
     
 
