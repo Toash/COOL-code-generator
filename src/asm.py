@@ -531,7 +531,6 @@ class CoolAsmGen:
         def gen_dispatch_helper(self, Exp, Type, Method, Args):
             self.debug("sp")
 
-            #save self object and frame pointer to restore later
             self.append_asm(ASM_Push("fp"))
             self.append_asm(ASM_Push(self_reg))
 
@@ -542,6 +541,7 @@ class CoolAsmGen:
             arg n....
             receiver object
             """
+            # Push arguments on stack
             for arg in Args:
                 self.cgen(arg[1]) # skip line number
                 self.comment("Push argument on the stack.")
@@ -551,7 +551,7 @@ class CoolAsmGen:
             if isinstance(Exp,tuple):
                 Exp = Exp[1]
             if Exp:
-                #dynamic dispatch
+                # dynamic / static dispatch
                 self.cgen(Exp)
             else:
                 # self dispatch
@@ -579,13 +579,19 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
 
             if Exp: 
-                receiver_type = Exp.StaticType
-            if Type:
+                # Dynamic dispatch
+                class_name = Exp.StaticType
+            elif Type:
+                # Static Dispatch
+                # Vtable indices are monotonic
                 class_name = Type[1]
             else:
-                class_name = receiver_type if Exp else self.current_class
+                # Self dispatch
+                class_name = self.current_class
+
             method_name = Method.str
             method_vtable_index = self.method_index.lookup(class_name,method_name)
+
             self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
             self.append_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
             self.comment(f"Indirectly call the method.")
@@ -1015,6 +1021,20 @@ class CoolAsmGen:
                         self.comment("IO.out_string stores output into self register.")
                         self.append_asm(ASM_Mov(acc_reg,self_reg))
 
+                    case "String.length":
+                        self.cgen(New(Type="Int",StaticType="Int"))
+                        # move Int object to temp
+                        self.append_asm(ASM_Mov(temp_reg,acc_reg))
+                        # move string literal
+                        self.append_asm(ASM_Ld(acc_reg,self_reg,attributes_start_index))
+                        self.append_asm(ASM_Syscall(Body))
+
+                        # store length in the Int object
+                        self.append_asm(ASM_St(temp_reg, acc_reg, attributes_start_index))
+                        self.append_asm(ASM_Mov(acc_reg, temp_reg))
+
+                        
+                        
 
                     case _:
                         # raise Exception("Unhandled internal method: ", Body)

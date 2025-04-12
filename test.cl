@@ -1,19 +1,11 @@
-class Foo inherits IO{
-    print() : Object{
-       out_string("Foo!\n") 
-    };
-};
+class Main inherits IO{
+    main():Object{
+        let string:String <- "Hello\n" in 
+        {
+            out_string(string);
+            out_int(string.length());
+            out_string("\n");
+        }
 
-class Bazz inherits Foo{
-    print() : Object{
-       out_string("Bazz!\n") 
-    };
-};
-
-class Main{
-    main(): Object{
-
-        let foo : Bazz <- (new Bazz) in 
-        foo@Foo.print()
     };
 };
