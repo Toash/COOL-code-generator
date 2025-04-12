@@ -55,6 +55,10 @@ class CoolAsmGen:
         # used for calculating offsets from frame pointer.
         self.temporary_index = 0
 
+
+        self.class_name_to_type_tag : dict[str:int] = {} 
+
+
         # store index with <type, mname>
         # to lookup when emitting code for dispatch
         self.vtable_method_indexes = {}
@@ -601,13 +605,15 @@ class CoolAsmGen:
             if isinstance(Exp,tuple):
                 Exp = Exp[1]
             if Exp:
+                #dynamic dispatch
                 self.cgen(Exp)
             else:
+                # self dispatch
                 # object on which current method is invoked.
                 self.comment("Move receiver to accumulator.")
                 self.append_asm(ASM_Mov(acc_reg,self_reg))
 
-            self.comment("Push self receiver on the stack.")
+            self.comment("Push receiver on the stack.")
             self.append_asm(ASM_Push(acc_reg))
 
 
@@ -623,13 +629,8 @@ class CoolAsmGen:
             self.comment("Loading v table.")
             self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
 
-
             if Exp: 
-                # If Exp is tuple then we gotta skip the line number
-                if isinstance(Exp.Type, tuple):
-                    receiver_type = Exp.Type[1]
-                else:
-                    receiver_type = Exp.Type
+                receiver_type = Exp.StaticType
 
             class_name = receiver_type if Exp else self.current_class
             method_name = Method.str

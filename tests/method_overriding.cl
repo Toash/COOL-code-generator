@@ -10,12 +10,17 @@ class Bazz inherits Foo{
     };   
 };
 
+class Foo2 inherits Foo{
+
+};
+
 
 class Main{
     main(): Object {
         {
             (new Foo).print(); 
             (new Bazz).print(); 
+            (new Foo2).print(); 
         }
     };
 };

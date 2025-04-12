@@ -18,6 +18,7 @@ TESTS=(
   "method_other_class"
   "method_inheritance"
   "method_overriding"
+  "dynamic_dispatch"
 )
 
 GREEN='\033[0;32m'
