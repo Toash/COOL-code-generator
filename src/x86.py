@@ -31,13 +31,17 @@ class X86Gen:
             emit_print_check_tab(self.outfile)
             emit_print(self.outfile)
 
+            emit_coolstrlen_start(self.outfile)
+            emit_coolstrlen_test(self.outfile)
+            emit_coolstrlen_increment(self.outfile)
+
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
             self.outfile.close()
 
     def write(self,string, not_tabbed = False):
         if not not_tabbed: 
-            self.tab()
+            self.outfile.write("\t\t")
         self.outfile.write(string)
 
     def cool_asm_to_x86(self,cool_asm):
@@ -215,32 +219,26 @@ class X86Gen:
                             self.write("movq\t %r13, %rdi ## move string pointer (just raw value in a String object) to rdi.\n")
                             self.write("call\t cooloutstr\n")
                         case "String.length":
-                            pass
+                            self.write("## String.length\n")
+                            self.write("movq\t %r13, %rdi\n")
+                            self.write("movl\t $0, %eax\n")
+                            self.write("call\t coolstrlen\n")
+                            self.write("movq\t %rax, %r13\n")
                         case _:
                             self.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):
                     for char in string:
-                        self.tab()
-                        self.outfile.write(f".byte\t {ord(char)} \t ## \"{char}\"\n")
-                    self.tab()
-                    self.outfile.write(f".byte\t 0 ## null char\n")
+                        self.write(f".byte\t {ord(char)} \t ## \"{char}\"\n")
+                    self.write(f".byte\t 0 ## null char\n")
                 case ASM_Constant_label(label):
-                    self.tab()
-                    self.outfile.write(f".quad\t {label}\n")
+                    self.write(f".quad\t {label}\n")
                 case ASM_Comment(comment,not_tabbed):
-                    # lol
-                    if not not_tabbed:
-                        self.tab()
-
-                    self.outfile.write("## " + comment.strip()+"\n")
+                    self.outfile.write("## " + comment.strip()+"\n",not_tabbed)
                     
 
                 case _:
                     print("x86: Unhandled Cool_asm:",instr)
 
-    # this was not a good idea
-    def tab(self):
-        self.outfile.write("\t\t")
 
     #cool_asm to x86 register
     def get_reg(self,reg):
@@ -254,14 +252,8 @@ class X86Gen:
             "sp":"%rsp",
         }[reg]
 
-    def write(self,string,not_tabbed = False):
-        if not_tabbed:
-            self.outfile.write(string)
-        else:
-            self.outfile.write("\t\t" + string)
 
         
-
 
 if __name__ == "__main__":
     x86_gen = X86Gen(sys.argv[1])

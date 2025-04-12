@@ -1028,6 +1028,9 @@ class CoolAsmGen:
                         # move string literal
                         self.append_asm(ASM_Ld(acc_reg,self_reg,attributes_start_index))
                         self.append_asm(ASM_Syscall(Body))
+                        # for cool-asm: length in acc_reg
+                        # for x86: length in rax
+
 
                         # store length in the Int object
                         self.append_asm(ASM_St(temp_reg, acc_reg, attributes_start_index))
