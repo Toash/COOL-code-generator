@@ -9,7 +9,7 @@ from asm_comparisons import *
 from asm_strings import * 
 from asm_symbol_stack import *
 from asm_locations import *
-
+from asm_method_index import *
 
 class CoolAsmGen:
     def __init__(self, file, x86=False):
@@ -17,25 +17,17 @@ class CoolAsmGen:
         self.asm_instructions = [] # cool assembly emitted here.
 
         self.symbol_stack = SymbolStack()
-
-        # when going to into method - check how much space needed on stack for memory allocation.
+        self.method_index = MethodIndex()
         self.temporaries_needed= 0
-        # used for calculating offsets from frame pointer.
         self.temporary_index = 0
 
 
-        self.class_name_to_type_tag : dict[str:int] = {} 
-
-
-        # store index with <type, mname>
-        # to lookup when emitting code for dispatch
-        self.vtable_method_indexes = {}
 
         # keep track of current_class for self_dispatch.
         # because we need the type to call the constructor.
         self.current_class = None
 
-        # when generating branches in conditionals, need to make unique labels
+        # counter for unique labels
         self.branch_counter = 0
 
         # maps strings to the labels that contain the allocated memory.
@@ -230,8 +222,7 @@ class CoolAsmGen:
 
             constant_constructor = f"{cls}..new"
             self.append_asm(ASM_Constant_label(label= constant_constructor))
-            self.vtable_method_indexes[(cls, "new")] = index
-            index += 1
+            self.method_index.insert(cls,"new")
 
 
             # inherited methods
@@ -242,15 +233,15 @@ class CoolAsmGen:
                     if cls == class_name:
                         # body contaisn a string for the actual class and method called.
                         self.append_asm(ASM_Constant_label(label=f"{exp.Body}"))
-                        self.vtable_method_indexes[(class_name, (exp.Body).split(".")[1] )] = index
-                        index += 1
+                        self.method_index.insert(class_name,(exp.Body).split(".")[1])
                 else:
                     if cls == class_name:
 
                         self.append_asm(ASM_Constant_label(label=f"{class_name}.{method_name}"))
                         # self.vtable_method_indexes[(class_name, method_name)] = index
-                        self.vtable_method_indexes[(class_name, method_name)] = index
-                        index+=1
+                        self.method_index.insert(class_name,method_name)
+            
+            self.method_index.reset_index()
 
     def emit_constructors(self) -> None:
         self.comment("CONSTRUCTORS",not_tabbed=True)
@@ -599,8 +590,7 @@ class CoolAsmGen:
 
             class_name = receiver_type if Exp else self.current_class
             method_name = Method.str
-            method_vtable_index = self.vtable_method_indexes[(class_name, method_name)]
-
+            method_vtable_index = self.method_index.lookup(class_name,method_name)
             self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
             self.append_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
             self.comment(f"Indirectly call the method.")
