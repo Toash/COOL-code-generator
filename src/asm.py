@@ -1012,7 +1012,7 @@ class CoolAsmGen:
                         self.append_asm(ASM_Mov(acc_reg,temp_reg))
 
                     case "IO.out_string":
-                        self.cgen(Identifier(Var="x", StaticType=None))
+                        self.cgen(Identifier(Var="x", StaticType="String"))
 
                         self.comment("Load unboxed string")
                         self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
@@ -1036,8 +1036,22 @@ class CoolAsmGen:
                         self.append_asm(ASM_St(temp_reg, acc_reg, attributes_start_index))
                         self.append_asm(ASM_Mov(acc_reg, temp_reg))
 
-                        
-                        
+                    case "String.concat":
+                        # the final string
+                        self.cgen(New(Type="String",StaticType="String"))
+                        self.append_asm(ASM_Mov(temp2_reg,acc_reg))
+
+                        self.cgen(Identifier(Var="s",StaticType="String"))
+                        self.append_asm(ASM_Mov(temp_reg,acc_reg))
+                        self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Ld(acc_reg,self_reg,attributes_start_index))
+
+                        self.append_asm(ASM_Syscall(Body))
+                        # cool-asm: acc contains combined string
+                        # x86: rax contains combined string
+                        self.append_asm(ASM_St(temp2_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Mov(acc_reg,temp2_reg))
+                     
 
                     case _:
                         # raise Exception("Unhandled internal method: ", Body)

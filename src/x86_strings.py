@@ -207,6 +207,8 @@ def emit_coolstrlen_start(outfile):
 
     # counter for length
     write(outfile,"movl\t $0, -4(%rbp)")
+    write(outfile,"jmp coolstrlen_test")
+
 
 
 # test char
