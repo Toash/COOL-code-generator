@@ -1,0 +1,15 @@
+
+"""
+COOL ASM STACK MACHINE CONVENTION:
+
+Calling convention - on function exit, sp is same as it was on entry.
+- In cool-asm, we add to stack  pointer  (deallocating parameters, receiver object and temporaries) in the function itself.
+    (because the reference compiler does it :/ )
+- in x86, we add to rsp after  the funcdtion caller (from the caller itself).
+- the cool-asm reference compilter needs to add one to temporaries becauase it pops r0.
+
+On function call,
+- push parameters on stack
+- push receiver object.
+- x86 return address  gets pushed as well during call.
+"""

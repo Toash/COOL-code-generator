@@ -1,54 +1,22 @@
 import sys
 from collections import namedtuple
 from annotated_ast_reader import AnnotatedAstReader
-
-from asm_registers import *
-from asm_constants import *
-
 from ast_nodes import *
 from asm_instructions import *
-
+from asm_registers import *
+from asm_constants import *
 from asm_comparisons import *
 from asm_strings import * 
+from asm_symbol_stack import *
+from asm_locations import *
 
-
-
-# where variables can live
-Register = namedtuple("Register","reg")
-Offset = namedtuple("Offset","reg offset")
-
-"""
-COOL ASM STACK MACHINE CONVENTION:
-
-Calling convention - on function exit, sp is same as it was on entry.
-- In cool-asm, we add to stack  pointer  (deallocating parameters, receiver object and temporaries) in the function itself.
-    (because the reference compiler does it :/ )
-- in x86, we add to rsp after  the funcdtion caller (from the caller itself).
-- the cool-asm reference compilter needs to add one to temporaries becauase it pops r0.
-
-On function call,
-- push parameters on stack
-- push receiver object.
-- x86 return address  gets pushed as well during call.
-
-Note: in cool-asm, return jumps to ra.
-    so after function ends (and stack is the same before call, pop ra then return.)
-"""
 
 class CoolAsmGen:
-    """
-    file - cl-type file name for Parser
-    outfile - file stream for cl-asm, for flushing cl-asm. should be provided if flushing.
-    x86 - generates output that does not work for cool_asm, but is for x86 convention.
-    """
     def __init__(self, file, x86=False):
         self.x86=x86
         self.asm_instructions = [] # cool assembly emitted here.
 
-        # maps variable to member locations.
-        # variable could live in register
-        # or offset ( fp[4] )
-        self.symbol_stack = [{}]
+        self.symbol_stack = SymbolStack()
 
         # when going to into method - check how much space needed on stack for memory allocation.
         self.temporaries_needed= 0
@@ -88,9 +56,6 @@ class CoolAsmGen:
         # populate string to labels mapping:
         for class_name in self.class_map:
             self.insert_to_string_label(class_name)
-
-
-
 
         self.emit_vtables()
         self.emit_constructors()
@@ -452,7 +417,7 @@ class CoolAsmGen:
             # second, and overriding all of setX's formals
             #   -- live at offsets from the frame pointer
 
-            self.push_scope()
+            self.symbol_stack.push_scope()
 
             #  FIXME: Fields
             # step 1 - fields / attr in scope
@@ -460,7 +425,7 @@ class CoolAsmGen:
                 if index==attributes_start_index:
                     self.comment("Setting up addresses for attributes (based off offsets from self reg)")
                 self.comment(f"Setting up attribute, it lives in {self_reg}[{index}]")
-                self.insert_symbol(attr.Name , Offset(self_reg, index))
+                self.symbol_stack.insert_symbol(attr.Name , Offset(self_reg, index))
 
             # step 2 - formals in scope
             for index,arg in enumerate(imp[:-1],start=1):
@@ -484,7 +449,7 @@ class CoolAsmGen:
 
                 # these formals live at at offset of the frame pointer.
                 self.comment(f"Add argument {arg} to symbol table, it lives in fp[{fp_offset}]")
-                self.insert_symbol(arg, Offset("fp", fp_offset))
+                self.symbol_stack.insert_symbol(arg, Offset("fp", fp_offset))
 
             # we need to actually load these args in .
 
@@ -549,7 +514,7 @@ class CoolAsmGen:
             self.append_asm(ASM_Pop("ra"))
             self.append_asm(ASM_Li(temp_reg,ASM_Word(num_args+self.temporaries_needed+1)))
             self.append_asm(ASM_Add(temp_reg,"sp"))
-            self.pop_scope()
+            self.symbol_stack.pop_scope()
             self.append_asm(ASM_Return())
         else:
             # the x86 way
@@ -676,11 +641,10 @@ class CoolAsmGen:
             # programs pass through semantic analyzer so we shouldnt have to check if var is  defined i guess?
             case Assign(Var,Exp):
 
-                # print(self.lookup_symbol(Var[1]))
 
                 self.cgen(Exp[1])
 
-                match self.lookup_symbol(Var[1]):
+                match self.symbol_stack.lookup_symbol(Var[1]):
                     case Offset(reg,offset):
                         self.append_asm(ASM_St(reg,acc_reg,offset))
                     case Register(reg):
@@ -969,7 +933,7 @@ class CoolAsmGen:
                     var = Var.Name
                 if isinstance(Var,str):
                     var=Var
-                match self.lookup_symbol(var):
+                match self.symbol_stack.lookup_symbol(var):
                     case Register(reg):
                         self.comment(f"Found variable {var} in register {reg}")
                         self.append_asm(ASM_Mov(dest = acc_reg, src = reg))
@@ -998,7 +962,7 @@ class CoolAsmGen:
                 # pushing new scope so that we can store the positions for varibles.
                 # so that when we encounter a variable that we set in the bindings,
                 #   we can correctly refer to it.
-                self.push_scope()
+                self.symbol_stack.push_scope()
 
 
                 self.comment("Code generating let bindings.")
@@ -1009,7 +973,7 @@ class CoolAsmGen:
                 self.cgen(Body[1])
 
                 self.temporary_index = 0
-                self.pop_scope()
+                self.symbol_stack.pop_scope()
 
 
             case Let_No_Init(Var,Type):
@@ -1017,7 +981,7 @@ class CoolAsmGen:
                 self.cgen(New(Type=Type.str,StaticType=Type.str))
                 self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
-                self.insert_symbol(var,Offset("fp",self.temporary_index))
+                self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
 
             case Let_Init(Var,Type,Exp):
@@ -1025,7 +989,7 @@ class CoolAsmGen:
                 self.cgen(Exp[1])
                 self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
-                self.insert_symbol(var,Offset("fp",self.temporary_index))
+                self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
 
 
@@ -1082,30 +1046,7 @@ class CoolAsmGen:
     def comment(self,comment,not_tabbed=False):
         self.asm_instructions.append(ASM_Comment(comment=comment,not_tabbed=not_tabbed))
 
-    # call when entering new expression
-    def push_scope(self):
-        self.comment(f"Entering new scope for symbol table.")
-        self.symbol_stack.append({})
-        # print("push  scope:",self.symbol_stack)
 
-    def pop_scope(self):
-        self.comment(f"Leaving current scope for symbol table.")
-        self.symbol_stack.pop()
-        # print("pop scope:",self.symbol_stack)
-
-    def insert_symbol(self, symbol:str, loc:Register | Offset):
-        self.comment(f"adding {symbol} to symbol table with value {loc}")
-        self.symbol_stack[-1][symbol] = loc
-        # print("insert symbol:",self.symbol_stack)
-        
-
-    def lookup_symbol(self, symbol:str):
-        for scope in reversed(self.symbol_stack):
-            if symbol in scope:
-                return scope[symbol]
-        return None
-        # print (f"Could not find symbol {symbol} in scope!")
-        # sys.exit(1)
 
     def get_branch_label(self):
         self.branch_counter+=1
