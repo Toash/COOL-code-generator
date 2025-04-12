@@ -528,8 +528,7 @@ class CoolAsmGen:
     leave stack the way we found it
     """
     def cgen(self, exp)->None:
-        def gen_dispatch_helper(self, Exp, Method, Args):
-
+        def gen_dispatch_helper(self, Exp, Type, Method, Args):
             self.debug("sp")
 
             #save self object and frame pointer to restore later
@@ -574,12 +573,17 @@ class CoolAsmGen:
             # e.g: someone wants to invoke "out_int" or "main"
             # emit code to lookup in vtable.
             self.comment("Loading v table.")
-            self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
+            if Type:
+                self.append_asm(ASM_La(temp_reg, f"{Type[1]}..vtable"))
+            else:
+                self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
 
             if Exp: 
                 receiver_type = Exp.StaticType
-
-            class_name = receiver_type if Exp else self.current_class
+            if Type:
+                class_name = Type[1]
+            else:
+                class_name = receiver_type if Exp else self.current_class
             method_name = Method.str
             method_vtable_index = self.method_index.lookup(class_name,method_name)
             self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
@@ -637,9 +641,11 @@ class CoolAsmGen:
 
             # Dispatch
             case Dynamic_Dispatch(Exp,Method,Args):
-                gen_dispatch_helper(self,Exp=Exp, Method=Method, Args=Args)
+                gen_dispatch_helper(self, Exp=Exp, Type=None, Method=Method, Args=Args)
+            case Static_Dispatch(Exp,Type,Method,Args):
+                gen_dispatch_helper(self, Exp=Exp, Type=Type, Method=Method, Args=Args)
             case Self_Dispatch(Method,Args):
-                gen_dispatch_helper(self,Exp=None, Method=Method, Args=Args)
+                gen_dispatch_helper(self, Exp=None, Type=None, Method=Method, Args=Args)
 
             case If(Predicate, Then, Else):
                 self.cond_then_label = "true_" + self.get_branch_label()

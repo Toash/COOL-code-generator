@@ -19,6 +19,7 @@ TESTS=(
   "method_inheritance"
   "method_overriding"
   "dynamic_dispatch"
+  "static_dispatch"
 )
 
 GREEN='\033[0;32m'
@@ -49,3 +50,4 @@ done
 rm my_out
 rm my_output.txt
 rm ref_output.txt
+rm -rf ./src/__pycache__
