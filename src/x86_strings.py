@@ -69,7 +69,7 @@ def emit_cooloutstr_loop_start(outfile):
 
     # check for null character (\0)
     write(outfile,"testb\t %al, %al")
-    write(outfile,"jne\t print_check_newline")
+    write(outfile,"jne\t cooloutstr_check_newline")
 
     write(outfile,"movq\t stdout(%rip),%rax")
     write(outfile,"movq\t %rax, %rdi")
@@ -87,8 +87,8 @@ def emit_cooloutstr_loop_start(outfile):
 
 # checks  if the  next two chars are for newline ()
 # if not, check if they are for tab (\t)
-def emit_print_check_newline(outfile):
-    write(outfile,"print_check_newline:",not_tabbed=True)
+def emit_cooloutstr_check_newline(outfile):
+    write(outfile,"cooloutstr_check_newline:",not_tabbed=True)
     # load loop index
     write(outfile,"movl\t -4(%rbp), %eax")
     # convert eax to 64 bit (rax)
@@ -101,7 +101,7 @@ def emit_print_check_newline(outfile):
     # check for backslash
     write(outfile,"cmpb\t $92, %al ## backslash ")
     # no backslash, check if its tab 
-    write(outfile,"jne\t print_check_tab")
+    write(outfile,"jne\t cooloutstr_check_tab")
 
     # load loop index
     write(outfile,"movl\t -4(%rbp), %eax")
@@ -117,7 +117,7 @@ def emit_print_check_newline(outfile):
     # is input[i+1] == n?
     write(outfile,"cmpb\t $110, %al ## n for newline")
     #no n, check if its tab.
-    write(outfile,"jne\t print_check_tab")
+    write(outfile,"jne\t cooloutstr_check_tab")
     # -------- print newline --------
     # set up second argument  (stdout  for a call to putc.)
     # load address of stdout into rax
@@ -137,8 +137,8 @@ def emit_print_check_newline(outfile):
 
 # checks  if the  next two chars are for tab (\t)
 # if not, print normally. 
-def emit_print_check_tab(outfile):
-    write(outfile,"print_check_tab:",not_tabbed=True)
+def emit_cooloutstr_check_tab(outfile):
+    write(outfile,"cooloutstr_check_tab:",not_tabbed=True)
     # load index
     write(outfile,"movl\t -4(%rbp), %eax")
     write(outfile,"cltq")
@@ -149,7 +149,7 @@ def emit_print_check_tab(outfile):
     # check for backslash
     write(outfile,"cmpb\t $92, %al ## backslash")
     # we dont have a backslash, so just print normally at this point.
-    write(outfile,"jne\t print")
+    write(outfile,"jne\t cooloutstr_print")
 
 
     write(outfile,"movl\t -4(%rbp), %eax")
@@ -160,7 +160,7 @@ def emit_print_check_tab(outfile):
     write(outfile,"movzbl\t (%rax), %eax")
     # t ( tab,  \t)
     write(outfile,"cmpb\t $116, %al ## t for tab")
-    write(outfile,"jne\t print")
+    write(outfile,"jne\t cooloutstr_print")
 
     # print tab
     write(outfile,"movq\t stdout(%rip), %rax")
@@ -176,8 +176,8 @@ def emit_print_check_tab(outfile):
 
 
 
-def emit_print(outfile):
-    write(outfile,"print:",not_tabbed=True)
+def emit_cooloutstr_print(outfile):
+    write(outfile,"cooloutstr_print:",not_tabbed=True)
     write(outfile,"movq\t stdout(%rip), %rdx")
     write(outfile,"movl\t -4(%rbp), %eax")
     write(outfile,"cltq")
@@ -243,7 +243,90 @@ def emit_coolstrlen_increment(outfile):
     write(outfile,"movl\t %eax, -4(%rbp)")
     write(outfile,"jmp\t\t coolstrlen_test")
 
+
+
+def emit_cat_placeholders(outfile):
+    write(outfile,"cat_placeholders:",True)
+    write(outfile,".string \"%s%s\"")
+    write(outfile,".text")
+
+def emit_coolstrcat_start(outfile):
+    write(outfile,".globl coolstrcat",True)
+    write(outfile,"coolstrcat:",True)
+    write(outfile,"coolstrcat_start:",True)
+    write(outfile,"pushq\t %rbp")
+    write(outfile,"movq\t %rsp, %rbp")
+    write(outfile,"pushq\t %rbx")
+    write(outfile,"subq\t $40, %rsp")
+
+    # the strings
+    write(outfile,"movq\t %rdi, -40(%rbp)")
+    write(outfile,"movq\t %rsi, -48(%rbp)") 
+    write(outfile,"cmpq\t $0, -40(%rbp)")
+    write(outfile,"jne\t coolstrcat_check_second")
+
+    #  first  is null,  just  return second  string
+    write(outfile,"movq\t -48(%rbp), %rax")
+    write(outfile,"jmp coolstrcat_return")
+
+def emit_coolstrcat_check_second(outfile):
+    write(outfile,"coolstrcat_check_second:",True)
+    write(outfile,"cmpq\t $0, -48(%rbp)")
+    write(outfile,"jne\t coolstrcat_concat")
+    write(outfile,"movq\t -40(%rbp), %rax")
+    write(outfile,"jne\t coolstrcat_return")
+
+def emit_coolstrcat_concat(outfile):
+    write(outfile,"coolstrcat_concat:",True)
+    write(outfile,"movq\t -40(%rbp), %rax")
+    write(outfile,"movq\t %rax, %rdi")
+    write(outfile,"call\t coolstrlen")
+    write(outfile,"movl\t %eax, %ebx")
+
+    write(outfile,"movq\t -48(%rbp), %rax")
+    write(outfile,"movq\t %rax, %rdi")
+    write(outfile,"call\t coolstrlen")
+    write(outfile,"leal\t (%rbx,%rax), %eax")
+    #  for null character
+    write(outfile,"addl\t $1, %eax")
+    write(outfile,"movl\t %eax, -20(%rbp)")
+    write(outfile,"movl\t -20(%rbp), %eax")
+    write(outfile,"cltq")
+    # size of each elements
+    write(outfile,"movl\t $1, %esi")
+    # number of elements (combined string lengths)
+    write(outfile,"movq\t %rax, %rdi")
+    write(outfile,"call\t calloc")
+
+    # store resulting string 
+    write(outfile,"movq\t %rax, -32(%rbp)")
+    write(outfile,"movl\t $cat_placeholders, %edx")
+    write(outfile,"movl\t -20(%rbp), %eax")
+    write(outfile,"movslq\t %eax, %rbx")
+    write(outfile,"movq\t -48(%rbp), %rsi")
+    write(outfile,"movq\t -40(%rbp), %rcx")
+    write(outfile,"movq\t -32(%rbp), %rax")
+
+    write(outfile,"movq\t %rsi, %r8")
+    write(outfile,"movq\t %rbx, %rsi")
+    write(outfile,"movq\t %rax, %rdi")
+
+    write(outfile,"movl\t $0, %eax")
+    write(outfile,"call\t snprintf")
+    write(outfile,"movq\t -32(%rbp), %rax")
+
+def emit_coolstrcat_return(outfile):
+    write(outfile,"coolstrcat_return:",True)
+    write(outfile,"addq\t $40, %rsp")
+    write(outfile,"popq\t %rbx")
+    write(outfile,"leave")
+    write(outfile,"ret")
+
+
     
+
+    
+
 
 
 

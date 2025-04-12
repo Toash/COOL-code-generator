@@ -27,13 +27,20 @@ class X86Gen:
             # out_string
             emit_cooloutstr_start(self.outfile)
             emit_cooloutstr_loop_start(self.outfile)
-            emit_print_check_newline(self.outfile)
-            emit_print_check_tab(self.outfile)
-            emit_print(self.outfile)
+            emit_cooloutstr_check_newline(self.outfile)
+            emit_cooloutstr_check_tab(self.outfile)
+            emit_cooloutstr_print(self.outfile)
 
             emit_coolstrlen_start(self.outfile)
             emit_coolstrlen_test(self.outfile)
             emit_coolstrlen_increment(self.outfile)
+
+            emit_cat_placeholders(self.outfile)
+
+            emit_coolstrcat_start(self.outfile)
+            emit_coolstrcat_check_second(self.outfile)
+            emit_coolstrcat_concat(self.outfile)
+            emit_coolstrcat_return(self.outfile)
 
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
@@ -224,6 +231,15 @@ class X86Gen:
                             self.write("movl\t $0, %eax\n")
                             self.write("call\t coolstrlen\n")
                             self.write("movq\t %rax, %r13\n")
+                        case "String.concat":
+                            self.write("movq\t %r13, %rdi\n")
+                            self.write("movq\t %r14, %rsi\n")
+                            self.write("## String.concat\n")
+                            self.write("call coolstrcat\n")
+
+                            # modify the combined stinrg we made earlier.
+                            self.write("movq\t %rax, %r13\n")
+
                         case _:
                             self.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):
