@@ -55,7 +55,6 @@ class CoolAsmGen:
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict())
         for line in self.dispatch_lines:
             emit_dispatch_on_void(self.asm_instructions,line)
-        emit_substr_out_of_range(self.asm_instructions)
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
@@ -1015,9 +1014,10 @@ class CoolAsmGen:
             case Internal(Body):
 
                 match Body:
-                    # when we loop through function args, store reference to arg (x) to offset in symbol table.
-                    #  now when we go here, we know where x lives.
-                    # The caller should pass in 1 argument ( not including self)
+                    case "Object.abort":
+                        self.append_asm(ASM_La(acc_reg,"cool_abort"))
+                        self.append_asm(ASM_Syscall("IO.out_string"))
+                        self.append_asm(ASM_Syscall("exit"))
                     case "IO.out_int":
                         # in the case of out_int, x should be an integer.
                         self.cgen(Identifier(Var="x", StaticType=None))
