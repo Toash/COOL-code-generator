@@ -756,6 +756,17 @@ class CoolAsmGen:
                         self.comment("IO.out_string stores output into self register.")
                         self.append_asm(ASM_Mov(acc_reg,self_reg))
 
+                    case "IO.in_string":
+                        self.cgen(New(Type="String",StaticType="String"))
+                        self.append_asm(ASM_Mov(temp_reg,acc_reg))
+                        self.append_asm(ASM_Syscall("IO.in_string"))
+
+                        # Store raw string in String object
+                        # probasbly have to move rax to acc_reg in x86
+                        self.append_asm(ASM_St(temp_reg,acc_reg,attributes_start_index))
+                        self.append_asm(ASM_Mov(acc_reg,temp_reg))
+
+
                     case "String.length":
                         self.cgen(New(Type="Int",StaticType="Int"))
                         # move Int object to temp
