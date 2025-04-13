@@ -25,6 +25,7 @@ TESTS=(
   "abort"
   "type_name"
   "copy"
+  "atoi"
 )
 
 GREEN='\033[0;32m'

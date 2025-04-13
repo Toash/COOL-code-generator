@@ -11,6 +11,7 @@ from asm_symbol_stack import *
 from asm_locations import *
 from asm_method_index import *
 from asm_string_to_label import *
+import uuid
 
 class CoolAsmGen:
     def __init__(self, file, x86=False):
@@ -358,20 +359,8 @@ class CoolAsmGen:
                 body_depth = self.compute_max_stack_depth(Body[1])
                 return body_depth
 
-            case Assign():
-                return 0
-
-            case Internal():
-                return 0
-
-            case Integer():
-                return 0
-
-            case Self_Dispatch () | Dynamic_Dispatch() | Static_Dispatch():
-                return 0
-
             case _:
-                print("Unhandled in stack analysis:", exp)
+                # print("Unhandled in stack analysis:", exp)
                 return 0
 
     def emit_methods(self)->None:
@@ -1161,6 +1150,7 @@ class CoolAsmGen:
     def get_branch_label(self):
         self.branch_counter+=1
         return f"branch_{self.branch_counter}"
+        # return (str(uuid.uuid4()).replace("-",""))
 
 
 if __name__ == "__main__":
