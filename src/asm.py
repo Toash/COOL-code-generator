@@ -31,7 +31,8 @@ class CoolAsmGen:
 
         self.branch_counter = 0 # unique labels
 
-
+        # Used to generate dispatch on void labels
+        self.dispatch_lines = []
 
         # Internal attributes
         # we done specify initializer as we handle them ourselves.
@@ -52,7 +53,8 @@ class CoolAsmGen:
         self.cond_while_label= ""
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict())
-        emit_dispatch_on_void(self.asm_instructions)
+        for line in self.dispatch_lines:
+            emit_dispatch_on_void(self.asm_instructions,line)
         emit_substr_out_of_range(self.asm_instructions)
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
@@ -78,6 +80,7 @@ class CoolAsmGen:
 
 
         self.emit_start()
+
         
 
 
@@ -531,6 +534,9 @@ class CoolAsmGen:
     """
     def cgen(self, exp)->None:
         def gen_dispatch_helper(self, Exp, Type, Method, Args):
+            if Exp:
+                exp_line_number = int(Exp[0])
+
             self.debug("sp")
 
             self.append_asm(ASM_Push("fp"))
@@ -555,12 +561,25 @@ class CoolAsmGen:
             if Exp:
                 # dynamic / static dispatch
                 self.cgen(Exp)
+                # check for void.
+                non_void_label = "non_void_"+self.get_branch_label()
+                self.append_asm(ASM_Bnz(acc_reg,non_void_label))
+                self.dispatch_lines.append(exp_line_number)
             else:
                 # self dispatch
                 # object on which current method is invoked.
                 self.comment("Move receiver to accumulator.")
                 self.append_asm(ASM_Mov(acc_reg,self_reg))
 
+
+            # Calling dispatch on void
+            if Exp:
+                self.append_asm(ASM_La(acc_reg,f"dispatch_void_{exp_line_number}"))
+                self.append_asm(ASM_Syscall("IO.out_string"))
+                self.append_asm(ASM_Syscall("exit"))
+
+            if Exp:
+                self.append_asm(ASM_Label(non_void_label))
             self.comment("Push receiver on the stack.")
             self.append_asm(ASM_Push(acc_reg))
 
@@ -973,7 +992,12 @@ class CoolAsmGen:
 
             case Let_No_Init(Var,Type):
                 var = Var[1]
-                self.cgen(New(Type=Type.str,StaticType=Type.str))
+                if Type.str == "Int" or Type.str == "String":
+                    self.cgen(New(Type=Type.str,StaticType=Type.str))
+                else:
+                    # Other objects
+                    self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
+
                 self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))

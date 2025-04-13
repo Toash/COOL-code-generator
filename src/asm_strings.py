@@ -13,11 +13,10 @@ def emit_string_constants(asm_instructions: list, x86:bool, string_label:dict)->
         asm_instructions.append(ASM_Constant_raw_string(string))
 
 
-def emit_dispatch_on_void(asm_instructions: list)->None:
-    asm_instructions.append(ASM_Label("dispatch_void"))
-    # FIXME: Why 4?
-    asm_instructions.append(ASM_Constant_raw_string("ERROR: 4: Exception: dispatch on void\n"))
+def emit_dispatch_on_void(asm_instructions: list,line_number:int)->None:
+    asm_instructions.append(ASM_Label(f"dispatch_void_{line_number}"))
+    asm_instructions.append(ASM_Constant_raw_string(f"ERROR: {line_number}: Exception: dispatch on void\\n"))
 
 def emit_substr_out_of_range(asm_instructions: list)->None:
     asm_instructions.append(ASM_Label("substr_bad"))
-    asm_instructions.append(ASM_Constant_raw_string("ERROR: 0: Exception: String.substr out of range\n"))
+    asm_instructions.append(ASM_Constant_raw_string("ERROR: 0: Exception: String.substr out of range\\n"))
