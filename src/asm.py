@@ -647,8 +647,6 @@ class CoolAsmGen:
             # Assign
             # programs pass through semantic analyzer so we shouldnt have to check if var is  defined i guess?
             case Assign(Var,Exp):
-
-
                 self.cgen(Exp[1])
 
                 match self.symbol_stack.lookup_symbol(Var[1]):
@@ -1020,6 +1018,36 @@ class CoolAsmGen:
                         # load object name
                         self.append_asm(ASM_Ld(temp_reg,temp_reg,0))
                         self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                    case "Object.copy":
+                        
+                        loop_start_label = "object_copy_loop_start" + self.get_branch_label()
+                        loop_end_label = "object_copy_loop_end" + self.get_branch_label()
+
+                        self.append_asm(ASM_Ld(temp_reg,self_reg,object_size_index))
+                        # allocate object size number of elements
+                        self.append_asm(ASM_Alloc(acc_reg,temp_reg))
+                        # Push pointer to allocated memory onto stack.
+                        self.append_asm(ASM_Push(acc_reg))
+                        self.append_asm(ASM_Label(loop_start_label))
+                        # temp reg is the amount of iterations we have left
+                        self.append_asm(ASM_Bz(temp_reg,loop_end_label))
+                        # copy over name
+                        self.append_asm(ASM_Ld(temp2_reg, self_reg,0))
+                        self.append_asm(ASM_St(acc_reg, temp2_reg,0))
+
+                        # next object field (for both copy and copee)
+                        self.append_asm(ASM_Li(temp2_reg,ASM_Word(1)))
+                        self.append_asm(ASM_Add(temp2_reg,self_reg))
+                        self.append_asm(ASM_Add(temp2_reg,acc_reg))
+                        
+                        self.append_asm(ASM_Li(temp2_reg,ASM_Value(1))) # i dont think we need this
+                        self.append_asm(ASM_Sub(temp2_reg,temp_reg))                        
+                        self.append_asm(ASM_Jmp(loop_start_label))                       
+
+                        self.append_asm(ASM_Label(loop_end_label))
+                        self.append_asm(ASM_Pop(acc_reg))
+
+                        # acc register is the self object with different memory addresses.
 
                     case "IO.out_int":
                         # in the case of out_int, x should be an integer.

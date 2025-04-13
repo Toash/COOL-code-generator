@@ -24,6 +24,7 @@ TESTS=(
   "dispatch_void"
   "abort"
   "type_name"
+  "copy"
 )
 
 GREEN='\033[0;32m'
