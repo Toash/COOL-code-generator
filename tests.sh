@@ -23,6 +23,7 @@ TESTS=(
   "static_dispatch"
   "dispatch_void"
   "abort"
+  "type_name"
 )
 
 GREEN='\033[0;32m'

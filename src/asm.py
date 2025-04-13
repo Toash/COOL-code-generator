@@ -204,16 +204,12 @@ class CoolAsmGen:
     # Loop through classes in imp map for their methods
     def emit_vtables(self) -> None:
         self.comment("VIRTUAL TABLES",not_tabbed=True)
-        self.comment("constants will represent .quad in x86",not_tabbed=True)
-        self.comment("they will represent 8 byte delineations in memory.",not_tabbed=True)
-        self.comment("key insight for dynamic dispatch to work correctly: method ordering should be the same",not_tabbed=True)
         for cls in self.class_map:
             index = 0
             self.append_asm(ASM_Label(label = f"{cls}..vtable"))
 
-            # FIXME: cl-asm prints constant to class name why?
-
-
+            self.string_to_label.insert(cls)
+            self.append_asm(ASM_Constant_label(label= self.string_to_label.get(cls)))
 
             constant_constructor = f"{cls}..new"
             self.append_asm(ASM_Constant_label(label= constant_constructor))
@@ -297,7 +293,6 @@ class CoolAsmGen:
             self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))
             self.append_asm(ASM_St(self_reg, temp_reg, type_tag_index))
 
-            # TODO: implement object size
             self.comment(f"Store object size at index {object_size_index}")
             self.append_asm(ASM_Li(temp_reg,ASM_Value(3 + len(attrs))))
             self.append_asm(ASM_St(self_reg, temp_reg, object_size_index))
@@ -311,12 +306,13 @@ class CoolAsmGen:
             for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
                 if not attr.Initializer: 
                     if attr.Type == "Unboxed_Int":
-                        self.comment(f"Store raw int {0} for attribute in Int.")
+                        self.comment(f"Store raw int {0} for attribute in {cls}.")
                         self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
                     elif attr.Type == "Unboxed_String":
                         self.comment(f"Store raw string for attribute in String.")
                         self.append_asm(ASM_La(acc_reg,"the.empty.string"))
                     else:
+                        # FIXME: other objects correctly
                         self.cgen(New(Type=attr.Type, StaticType=attr.Type))
                 elif attr.Initializer:   
                     exp = attr.Initializer[1]
@@ -991,7 +987,7 @@ class CoolAsmGen:
 
             case Let_No_Init(Var,Type):
                 var = Var[1]
-                if Type.str == "Int" or Type.str == "String":
+                if Type.str == "Int" or Type.str == "String" or Type.str == "Bool":
                     self.cgen(New(Type=Type.str,StaticType=Type.str))
                 else:
                     # Other objects
@@ -1018,6 +1014,13 @@ class CoolAsmGen:
                         self.append_asm(ASM_La(acc_reg,"cool_abort"))
                         self.append_asm(ASM_Syscall("IO.out_string"))
                         self.append_asm(ASM_Syscall("exit"))
+                    case "Object.type_name":
+                        self.cgen(New(Type="String",StaticType="String"))
+                        self.append_asm(ASM_Ld(temp_reg,self_reg,vtable_index))
+                        # load object name
+                        self.append_asm(ASM_Ld(temp_reg,temp_reg,0))
+                        self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+
                     case "IO.out_int":
                         # in the case of out_int, x should be an integer.
                         self.cgen(Identifier(Var="x", StaticType=None))
