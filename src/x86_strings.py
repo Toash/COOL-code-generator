@@ -379,6 +379,99 @@ def emit_coolsubstr_end(outfile):
     write(outfile,"ret")
 
 
+def emit_empty_string(outfile):
+    write(outfile,"empty_string:",True)
+    write(outfile,".string \"\"")
+    write(outfile,".text")
+
+def emit_coolgetstr_start(outfile):
+    write(outfile,"coolgetstr:",True)
+    write(outfile,"coolgetstr_start:",True)
+    write(outfile,"pushq\t %rbp")
+    write(outfile,"movq\t %rsp, %rbp")
+    write(outfile,"subq\t $32, %rsp")
+    write(outfile,"movl\t $1, %esi")
+    write(outfile,"movl\t $40960, %edi")
+
+    # memory allocation for the string
+    write(outfile,"call\t calloc")
+    # store allocated string in -16(%rbp)
+    write(outfile,"movq\t %rax, -16(%rbp)")
+    # null char flag
+    write(outfile,"movl\t $0, -4(%rbp)")
+
+# L20
+def emit_coolgetstr_loop_start(outfile):
+    write(outfile,"coolgetstr_loop_start:",True)
+    # read stdin stream one character at a time
+    write(outfile,"movq\t stdin(%rip), %rax")
+    write(outfile,"movq\t %rax, %rdi")
+    # fgetc advances the stream.
+    write(outfile,"call\t fgetc")
+    # store read character in -20(%rbp)
+    write(outfile,"movl\t %eax, -20(%rbp)")
+
+    # check for EOF 
+    write(outfile,"cmpl\t $-1, -20(%rbp)")
+    write(outfile,"je\t coolgetstr_end_condition")
+
+    # check for newline
+    write(outfile,"cmpl\t $10, -20(%rbp)")
+    write(outfile,"jne\t coolgetstr_check_null_char")
+
+# L14
+# \n or EOF
+def emit_coolgetstr_end_condition(outfile):
+    write(outfile,"coolgetstr_end_condition:",True)
+    write(outfile,"cmpl\t $0, -4(%rbp)")
+    write(outfile,"je\t coolgetstr_return_buffer")
+    write(outfile,"movl\t $empty_string, %eax")
+    write(outfile,"jmp\t coolgetstr_return")
+
+# L16
+# if input is null
+def emit_coolgetstr_return_buffer(outfile):
+    write(outfile,"coolgetstr_return_buffer:",True)
+    write(outfile,"movq\t -16(%rbp), %rax")
+    write(outfile,"jmp coolgetstr_return")
+
+# L15
+def emit_coolgetstr_check_null_char(outfile):
+    write(outfile,"coolgetstr_check_null_char:",True)
+    # check for null character
+    write(outfile,"cmpl\t $0, -20(%rbp)")
+    write(outfile,"jne\t coolgetstr_store_char")
+    write(outfile,"movl\t $1, -4(%rbp)")
+    write(outfile,"jmp\t coolgetstr_loop_start")
+
+# L18
+def emit_coolgetstr_store_char(outfile):
+    write(outfile,"coolgetstr_store_char:",True)
+    # base address of buffer
+    write(outfile,"movq\t -16(%rbp), %rax")
+    write(outfile,"movq\t %rax, %rdi")
+    # current string length
+    write(outfile,"call\t coolstrlen")
+    write(outfile,"mov\t %eax, %eax")
+
+    # next write location
+    write(outfile,"addq\t -16(%rbp), %rax")
+    # input character 
+    write(outfile,"movl\t -20(%rbp), %edx")
+    # store character 
+    write(outfile,"movb\t %dl, (%rax)")
+    write(outfile,"jmp\t coolgetstr_loop_start")
+    
+
+# L17
+# final raw string should be in rax
+def emit_coolgetstr_return(outfile):
+    write(outfile,"coolgetstr_return:",True)
+    write(outfile,"leave")
+    write(outfile,"ret")
+
+
+
 
 
     

@@ -47,6 +47,15 @@ class X86Gen:
             emit_coolsubstr_substr(self.outfile)
             emit_coolsubstr_end(self.outfile)
 
+            emit_empty_string(self.outfile)
+            emit_coolgetstr_start(self.outfile)
+            emit_coolgetstr_loop_start(self.outfile)
+            emit_coolgetstr_end_condition(self.outfile)
+            emit_coolgetstr_return_buffer(self.outfile)
+            emit_coolgetstr_check_null_char(self.outfile)
+            emit_coolgetstr_store_char(self.outfile)
+            emit_coolgetstr_return(self.outfile)
+
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
             self.outfile.close()
@@ -62,7 +71,7 @@ class X86Gen:
                 case ASM_Label(label):
                     if label == "start":
                         label = "main"
-                    self.write(f".globl {label}\n",True)
+                        self.write(f".globl {label}\n",True)
                     self.write(f"{label}:\n",True)
                 case ASM_Li(reg,imm):
                     if isinstance(imm,ASM_Value):
@@ -230,6 +239,12 @@ class X86Gen:
                             self.write("## out_string\n")
                             self.write("movq\t %r13, %rdi ## move string pointer (just raw value in a String object) to rdi.\n")
                             self.write("call\t cooloutstr\n")
+
+                        case "IO.in_string":
+                            self.write("## in_string\n")
+                            self.write("call\t coolgetstr\n")
+                            self.write("movq\t %rax, %r13\n")
+
                         case "String.length":
                             self.write("## String.length\n")
                             self.write("movq\t %r13, %rdi\n")
