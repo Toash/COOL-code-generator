@@ -84,7 +84,15 @@ def emit_comparison_handler(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "le":
         asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"le_int"))
 
-    # TODO: do same for string
+    # check for string and string 
+    asm_instructions.append(ASM_Comment("Both operands are Strings"))
+    asm_instructions.append(ASM_Li(temp_reg,ASM_Value(String_tag+String_tag))) 
+    if type == "eq":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_string"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"lt_string"))
+    elif type == "le":
+        asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"le_string"))
 
     if type == "eq":
         asm_instructions.append(ASM_Comment("otherwise, use pointer comparison"))
@@ -203,6 +211,51 @@ def emit_comparison_int(type:str,asm_instructions : list, x86:bool) -> None:
     elif type == "le":
         asm_instructions.append(ASM_Ble(acc_reg,temp_reg,"le_true"))
         asm_instructions.append(ASM_Jmp("le_false"))
+
+def emit_comparison_string(type:str,asm_instructions : list, x86:bool) -> None:
+    if type == "eq":
+        asm_instructions.append(ASM_Label("eq_string"))
+    elif type == "lt":
+        asm_instructions.append(ASM_Label("lt_string"))
+    elif type == "le":
+        asm_instructions.append(ASM_Label("le_string"))
+    asm_instructions.append(ASM_Comment("two strings"))
+    if not x86:
+        asm_instructions.append(ASM_Ld(acc_reg,"fp",3))
+        asm_instructions.append(ASM_Ld(temp_reg,"fp",2))
+    else:
+        asm_instructions.append(ASM_Ld(acc_reg,"fp",4))
+        asm_instructions.append(ASM_Ld(temp_reg,"fp",3))
+
+    asm_instructions.append(ASM_Comment("Extract raw values."))
+    asm_instructions.append(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+    asm_instructions.append(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+    
+    # load first char. 
+    if not x86:
+        asm_instructions.append(ASM_Ld(acc_reg,acc_reg,0))
+        asm_instructions.append(ASM_Ld(temp_reg,temp_reg,0))
+        if type == "eq":
+            asm_instructions.append(ASM_Beq(acc_reg,temp_reg,"eq_true"))
+            asm_instructions.append(ASM_Jmp("eq_false"))
+        elif type == "lt":
+            asm_instructions.append(ASM_Blt(acc_reg,temp_reg,"lt_true"))
+            asm_instructions.append(ASM_Jmp("lt_false"))
+        elif type == "le":
+            asm_instructions.append(ASM_Ble(acc_reg,temp_reg,"le_true"))
+            asm_instructions.append(ASM_Jmp("le_false"))
+    else:
+        if type == "eq":
+            asm_instructions.append(ASM_Syscall("string_compare_eq"))
+        elif type == "lt":
+            asm_instructions.append(ASM_Syscall("string_compare_le"))
+        elif type == "le":
+            asm_instructions.append(ASM_Syscall("string_compare_lt"))
+
+
+
+
+
 
 # IMPORTANT - tihs must be emitted
 def emit_comparison_end(type:str,asm_instructions : list, x86:bool) -> None:

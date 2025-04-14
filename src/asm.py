@@ -11,6 +11,7 @@ from asm_symbol_stack import *
 from asm_locations import *
 from asm_method_index import *
 from asm_string_to_label import *
+from asm_tags import *
 import uuid
 
 class CoolAsmGen:
@@ -24,6 +25,7 @@ class CoolAsmGen:
         self.symbol_stack = SymbolStack()
         self.method_index = MethodIndex()
         self.string_to_label = StringToLabel(self.class_map)
+        self.tags = Tags()
 
         self.temporaries_needed= 0
         self.temporary_index = 0
@@ -46,7 +48,7 @@ class CoolAsmGen:
         self.emit_constructors()
         self.emit_methods()
 
-        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict())
+        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
         for line in set(self.dispatch_lines):
             emit_dispatch_on_void(self.asm_instructions,line)
 
@@ -55,6 +57,7 @@ class CoolAsmGen:
         emit_comparison_true("eq", self.asm_instructions,x86)
         emit_comparison_bool("eq", self.asm_instructions,x86)
         emit_comparison_int("eq", self.asm_instructions,x86)
+        emit_comparison_string("eq", self.asm_instructions,x86)
         emit_comparison_end("eq", self.asm_instructions,x86)
 
         emit_comparison_handler("le", self.asm_instructions,x86)
@@ -62,6 +65,7 @@ class CoolAsmGen:
         emit_comparison_true("le", self.asm_instructions,x86)
         emit_comparison_bool("le", self.asm_instructions,x86)
         emit_comparison_int("le", self.asm_instructions,x86)
+        emit_comparison_string("le", self.asm_instructions,x86)
         emit_comparison_end("le", self.asm_instructions,x86)
 
         emit_comparison_handler("lt", self.asm_instructions,x86)
@@ -69,6 +73,7 @@ class CoolAsmGen:
         emit_comparison_true("lt", self.asm_instructions,x86)
         emit_comparison_bool("lt", self.asm_instructions,x86)
         emit_comparison_int("lt", self.asm_instructions,x86)
+        emit_comparison_string("lt", self.asm_instructions,x86)
         emit_comparison_end("lt", self.asm_instructions,x86)
 
 
@@ -138,9 +143,17 @@ class CoolAsmGen:
                     tag=Bool_tag
                 case "Int":
                     tag=Int_tag
+                case "String":
+                    tag=String_tag
+                case "IO":
+                    tag=IO_tag
+                case "Main":
+                    tag=Main_tag
+                case "Object":
+                    tag=Object_tag
                 case _:
-                    # FIXME: handle arbitrary amount of type tags.
-                    tag=1000
+                    # non built in class
+                    tag=self.tags.get()
 
             self.comment(f"Store type tag ({tag} for {cls}) at index {type_tag_index}")
             self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))

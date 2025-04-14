@@ -14,6 +14,7 @@ TESTS=(
   "string"
   "string_out_of_range"
   "THE_ULTIMATE_TEST"
+  "string_comparison"
   "attributes"
   "methods"
   "method_other_class"

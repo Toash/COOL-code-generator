@@ -3,8 +3,8 @@ class StringToLabel:
         self.string_to_label = {}
         self.string_to_label_counter = 0
 
-    def get_dict(self):
-        return self.string_to_label.copy()
+    def get_dict_sorted(self):
+        return dict(sorted(self.string_to_label.items()))
 
     def get(self,val):
         return self.string_to_label[val]

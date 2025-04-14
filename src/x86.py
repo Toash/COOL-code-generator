@@ -269,6 +269,29 @@ class X86Gen:
                             self.write("call\t coolsubstr\n")
                             self.write("movq\t %rax, %r13\n")
 
+
+                        case "string_compare_eq":
+                            self.write("movq\t %r13, %rdi\n")
+                            self.write("movq\t %r14, %rsi\n")
+                            self.write("call\t strcmp\n")
+                            self.write("cmp\t $0, %eax\n")
+                            self.write("je\t eq_true\n")
+                            self.write("jmp\t eq_false\n")
+                        case "string_compare_le":
+                            self.write("movq\t %r13, %rdi\n")
+                            self.write("movq\t %r14, %rsi\n")
+                            self.write("call\t strcmp\n")
+                            self.write("cmp\t $0, %eax\n")
+                            self.write("jle\t le_true\n")
+                            self.write("jmp\t le_false\n")
+                        case "string_compare_lt":
+                            self.write("movq\t %r13, %rdi\n")
+                            self.write("movq\t %r14, %rsi\n")
+                            self.write("call\t strcmp\n")
+                            self.write("cmp\t $0, %eax\n")
+                            self.write("jl\t lt_true\n")
+                            self.write("jmp\t lt_false\n")
+                            
                         case _:
                             self.write(f"TODO: implement system call for \"{name}\".\n")
                 case ASM_Constant_raw_string(string):
@@ -298,6 +321,8 @@ class X86Gen:
             "r3":"%r15",
             "fp":"%rbp",
             "sp":"%rsp",
+            "%eax":"%eax",
+            "%rax":"%rax",
         }[reg]
 
 
