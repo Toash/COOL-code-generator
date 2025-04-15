@@ -25,7 +25,7 @@ class CoolAsmGen:
         self.symbol_stack = SymbolStack()
         self.method_index = MethodIndex()
         self.string_to_label = StringToLabel(self.class_map)
-        self.tags = Tags()
+        self.class_to_tag = Tags()
 
         self.temporaries_needed= 0
         self.temporary_index = 0
@@ -36,6 +36,7 @@ class CoolAsmGen:
 
         # Used to generate dispatch on void labels
         self.dispatch_lines = []
+        self.case_lines=[]
 
         # Internal attributes
         # we done specify initializer as we handle them ourselves.
@@ -49,8 +50,11 @@ class CoolAsmGen:
         self.emit_methods()
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
+
         for line in set(self.dispatch_lines):
             emit_dispatch_on_void(self.asm_instructions,line)
+        for line in set(self.case_lines):
+            emit_case_on_void(self.asm_instructions,line)
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
@@ -153,7 +157,7 @@ class CoolAsmGen:
                     tag=Object_tag
                 case _:
                     # non built in class
-                    tag=self.tags.get()
+                    tag=self.class_to_tag.insert(cls)
 
             self.comment(f"Store type tag ({tag} for {cls}) at index {type_tag_index}")
             self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))
@@ -695,6 +699,81 @@ class CoolAsmGen:
                 self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
 
+            case Case(Exp, Elements):
+                line_number = Exp[0]
+                # from pprint import pprint
+                # pprint(Exp)
+                # pprint(Elements)
+
+                # Generate the expression
+                self.case_lines.append(line_number)
+                self.cgen(Exp[1])
+
+                # store expression in frame pointer.
+                self.append_asm(ASM_St("fp",acc_reg,0))
+                # load type tag into acc for comparison.
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,type_tag_index))
+                temp_class_name_to_label={}
+
+                for element in Elements:
+                    # print(element.Type.str)
+                    # print(self.class_to_tag.get(element.Type.str))
+                    class_name = element.Type.str
+                    type_tag = self.class_to_tag.get(class_name)
+
+                    self.append_asm(ASM_Li(temp_reg,ASM_Value(type_tag)))
+                    case_exp_label = f"case_exp_for_{class_name}_" + self.get_branch_label()
+                    temp_class_name_to_label[class_name] = case_exp_label 
+                    self.append_asm(ASM_Beq(acc_reg,temp_reg,case_exp_label))
+
+
+                #check for subtypes.                
+                # basically types that we havent added yet, but are subtypes of types that we already added.
+                # by added i mean, checking and branching if equal.
+                for class_name in self.class_map:
+                    if class_name not in temp_class_name_to_label:
+                        parent_name = self.parent_map.get(class_name)
+                        if parent_name in temp_class_name_to_label:
+                            # parent is something we already added, but we didnt add the subtype yet. we should add it. 
+                            child_type_tag= self.class_to_tag.get(class_name) 
+                            self.append_asm(ASM_Li(temp_reg,ASM_Value(child_type_tag)))
+                            case_exp_label = temp_class_name_to_label[parent_name]
+                            self.append_asm(ASM_Beq(acc_reg,temp_reg,case_exp_label))
+
+                # case without branch (everyhting else)
+                for class_name, tag in self.class_to_tag.get_dict().items():
+                    if class_name not in temp_class_name_to_label:
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))
+                        self.append_asm(ASM_Beq(acc_reg,temp_reg,f"case_without_branch_{line_number}"))
+
+                #  error branch
+                error_branch= "case_without_branch_" + line_number
+                self.append_asm(ASM_Label(error_branch))
+                self.append_asm(ASM_La(acc_reg,f"case_without_branch_{line_number}"))
+                self.append_asm(ASM_Syscall("IO.out_string"))
+                self.append_asm(ASM_Syscall("exit"))
+
+                # void branch
+                void_branch = "case_void_branch_" + line_number
+                self.append_asm(ASM_Label(void_branch))
+                self.append_asm(ASM_La(acc_reg,f"case_void_{line_number}"))
+                self.append_asm(ASM_Syscall("IO.out_string"))
+                self.append_asm(ASM_Syscall("exit"))
+
+                end_branch = "case_exp_end_" + self.get_branch_label()
+                # make the actual branches
+                for element in Elements:
+                    class_name = element.Type.str
+                    case_exp_label = temp_class_name_to_label[class_name]
+                    self.append_asm(ASM_Label(case_exp_label))
+                    self.cgen(element.Body[1])
+                    self.append_asm(ASM_Jmp(end_branch))
+                
+
+
+
+                self.append_asm(ASM_Label(end_branch))
+
 
             case Internal(Body):
 
@@ -1093,6 +1172,12 @@ class CoolAsmGen:
             case While(Predicate,Body):
                 body_depth = self.compute_max_stack_depth(Body[1])
                 return body_depth
+            
+            # TODO: is this actually correct
+            case Case(Exp,Elements):
+                depth = 1 # for exp
+                total_depth = depth + len(Elements)
+                return depth
 
             case _:
                 # print("Unhandled in stack analysis:", exp)
