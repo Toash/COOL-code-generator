@@ -2,6 +2,7 @@
 
 TESTS=(
   "arith"
+  "divide_by_zero"
   "assignment"
   "bool_no_let"
   "bool_let"

@@ -37,6 +37,7 @@ class CoolAsmGen:
         # Used to generate dispatch on void labels
         self.dispatch_lines = []
         self.case_lines=[]
+        self.div_zero_lines=[]
 
         # Internal attributes
         # we done specify initializer as we handle them ourselves.
@@ -55,6 +56,8 @@ class CoolAsmGen:
             emit_dispatch_on_void(self.asm_instructions,line)
         for line in set(self.case_lines):
             emit_case_on_void(self.asm_instructions,line)
+        for line in set(self.div_zero_lines):
+            emit_divide_by_zero(self.asm_instructions,line)
 
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
@@ -542,14 +545,32 @@ class CoolAsmGen:
                 # Multiplication result now in accumulator.
 
             case Divide(Left,Right):
+                denominator_line_number = Right[0]
+
                 self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
+
+                # keep track of these  for divide by zero.
+                if(int(Right[1].Integer) == 0):
+                    # print("zero found at line ",denominator_line_number)
+                    self.div_zero_lines.append(denominator_line_number)
+
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
-
                 self.comment("Load unboxed integers.")
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+
+                if(int(Right[1].Integer) == 0):
+                    # check for zero, if not , jump to true branch.
+                    div_ok_label = "div_ok_" + self.get_branch_label()
+                    self.append_asm(ASM_Bnz(acc_reg,div_ok_label))
+                    # denominnator is zero
+                    self.append_asm(ASM_La(acc_reg, "divide_by_zero_"+denominator_line_number))
+                    self.append_asm(ASM_Syscall("IO.out_string"))
+                    self.append_asm(ASM_Syscall("exit"))
+
+                    self.append_asm(ASM_Label(div_ok_label))
 
                 self.comment("Divide unboxed integers.")
                 self.append_asm(ASM_Div(acc_reg,temp_reg))
@@ -1171,6 +1192,8 @@ class CoolAsmGen:
     # for example, each let binding needs room on the stack.
     # dont need to reserve room for function args, as they are pushed on the stack prior.
     def compute_max_stack_depth(self, exp) -> int:
+        # FIXME: Actual compute this
+        return 1000;
         match exp:
 
             case Block(Body):
