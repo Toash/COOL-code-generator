@@ -28,6 +28,7 @@ TESTS=(
   "copy"
   "case"
   "case2"
+  "isvoid"
   "atoi"
 )
 

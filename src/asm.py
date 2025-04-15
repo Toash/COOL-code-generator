@@ -427,6 +427,24 @@ class CoolAsmGen:
                 self.append_asm(ASM_Pop("fp"))
                 # New object now in accumulator.
 
+            case IsVoid(Exp):
+                false_branch = "isvoid_false_branch_" + self.get_branch_label()
+                true_branch = "isvoid_true_branch_" + self.get_branch_label()
+                end_branch = "isvoid_end_branch_" + self.get_branch_label()
+                self.cgen(Exp[1])
+                self.append_asm(ASM_Bz(acc_reg, true_branch))
+                self.append_asm(ASM_Label(false_branch))
+                self.cgen(New(Type="Bool",StaticType="Bool"))
+                self.append_asm(ASM_Jmp(end_branch))
+
+                self.append_asm(ASM_Label(true_branch))
+                self.cgen(New(Type="Bool",StaticType="Bool"))
+                self.append_asm(ASM_Li(temp_reg,ASM_Value(1)))
+                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+
+                self.append_asm(ASM_Label(end_branch))
+
+
             case Plus(Left,Right):
                 self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
