@@ -26,6 +26,8 @@ TESTS=(
   "abort"
   "type_name"
   "copy"
+  "case"
+  "case2"
   "atoi"
 )
 
