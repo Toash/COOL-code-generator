@@ -674,6 +674,11 @@ class CoolAsmGen:
                     var = Var.Name
                 if isinstance(Var,str):
                     var=Var
+                
+                if var=="self":
+                    self.append_asm(ASM_Mov(acc_reg,self_reg))
+                    return
+
                 match self.symbol_stack.lookup_symbol(var):
                     case Register(reg):
                         self.comment(f"Found variable {var} in register {reg}")
@@ -685,7 +690,8 @@ class CoolAsmGen:
                         else:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                     case _:
-                        raise Exception(f"Could not find identifier {var}!")
+                        # raise Exception(f"Could not find identifier {var}!")
+                        print(f"Could not find identifier {var}!")
 
                 # loaded in acc
 
@@ -739,7 +745,10 @@ class CoolAsmGen:
                 self.temporary_index -= 1
 
             case Case(Exp, Elements):
+                self.symbol_stack.push_scope()
                 line_number = Exp[0]
+                void_branch = "case_void_branch_" + line_number
+
                 # from pprint import pprint
                 # pprint(Exp)
                 # pprint(Elements)
@@ -747,6 +756,7 @@ class CoolAsmGen:
                 # Generate the expression
                 self.case_lines.append(line_number)
                 self.cgen(Exp[1])
+                self.append_asm(ASM_Bz(acc_reg,void_branch))
 
                 # store expression in frame pointer.
                 self.append_asm(ASM_St("fp",acc_reg,0))
@@ -793,18 +803,22 @@ class CoolAsmGen:
                 self.append_asm(ASM_Syscall("exit"))
 
                 # void branch
-                void_branch = "case_void_branch_" + line_number
                 self.append_asm(ASM_Label(void_branch))
                 self.append_asm(ASM_La(acc_reg,f"case_void_{line_number}"))
                 self.append_asm(ASM_Syscall("IO.out_string"))
                 self.append_asm(ASM_Syscall("exit"))
 
                 end_branch = "case_exp_end_" + self.get_branch_label()
+
                 # make the actual branches
                 for element in Elements:
                     class_name = element.Type.str
                     case_exp_label = temp_class_name_to_label[class_name]
                     self.append_asm(ASM_Label(case_exp_label))
+
+                    # load in the branch variable or whatever its called
+                    self.symbol_stack.insert_symbol(symbol=element.Var.str,loc=Offset("fp",0))
+
                     self.cgen(element.Body[1])
                     self.append_asm(ASM_Jmp(end_branch))
                 
@@ -812,6 +826,7 @@ class CoolAsmGen:
 
 
                 self.append_asm(ASM_Label(end_branch))
+                self.symbol_stack.pop_scope()
 
 
             case Internal(Body):
