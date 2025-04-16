@@ -15,6 +15,7 @@ class Tags:
         return self.class_name_to_tag.copy()
         
     def insert(self,class_name):
+        # print(f"inserting {class_name}")
         self.class_name_to_tag[class_name] = self.counter 
         self.counter+=1
         return self.class_name_to_tag[class_name]

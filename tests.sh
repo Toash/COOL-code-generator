@@ -31,7 +31,10 @@ TESTS=(
   "case2"
   "case3"
   "isvoid"
-  "atoi"
+  "cool_atoi"
+  "cool_cells"
+  # "cool_hs" hairy scary indeed
+  "cool_list"
 )
 
 GREEN='\033[0;32m'

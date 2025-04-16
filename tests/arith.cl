@@ -1,4 +1,5 @@
 class Main inherits IO{
+    x:Int <- 2;
     main(): Object {
         -- arithmetic
         {
@@ -24,6 +25,28 @@ class Main inherits IO{
             out_int((1*3)+7);
             out_int(1+(3*7));
 
+            let x : Int<-1 in
+            {
+                x <- ~x;
+                out_int(x);
+                x <- ~x;
+                out_int(x);
+                x <- ~x;
+                out_int(x);
+                x <- ~x;
+                out_int(x);
+            };
+
+
+            x <- ~x;
+            out_int(x);
+            x <- ~x;
+            out_int(x);
+            x <- ~x;
+            out_int(x);
+            x <- ~x;
+            out_int(x);
+            
             
         }
     };

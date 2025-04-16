@@ -27,6 +27,11 @@ class CoolAsmGen:
         self.string_to_label = StringToLabel(self.class_map)
         self.class_to_tag = Tags()
 
+        internal_classes = ["Bool","Int","String","IO","Main","Object"]
+        for cls in self.class_map:
+            if cls not in internal_classes:
+                self.class_to_tag.insert(cls)
+
         self.temporaries_needed= 0
         self.temporary_index = 0
 
@@ -37,6 +42,9 @@ class CoolAsmGen:
         # Used to generate dispatch on void labels
         self.dispatch_lines = []
         self.case_lines=[]
+        # used to keep track of the lines that we emitted case statements for
+        #  TODO: delete this when i only emit  the necessary methods
+        self.traversed_case_lines=[]
         self.div_zero_lines=[]
 
         # Internal attributes
@@ -122,6 +130,7 @@ class CoolAsmGen:
         self.comment("CONSTRUCTORS",not_tabbed=True)
         self.comment("object will be in accumulator.",not_tabbed=True)
         for cls,attrs in self.class_map.items():
+            self.current_class = cls 
             self.append_asm(ASM_Label(label=f"{cls}..new"))
             if self.x86:
                 self.append_asm(ASM_Push("fp")) # we will set stack pointer to this later
@@ -161,7 +170,7 @@ class CoolAsmGen:
                     tag=Object_tag
                 case _:
                     # non built in class
-                    tag=self.class_to_tag.insert(cls)
+                    tag = self.class_to_tag.get(cls)
 
             self.comment(f"Store type tag ({tag} for {cls}) at index {type_tag_index}")
             self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))
@@ -699,7 +708,8 @@ class CoolAsmGen:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                     case _:
                         # raise Exception(f"Could not find identifier {var}!")
-                        print(f"Could not find identifier {var}!")
+                        #print(f"Could not find identifier {var}!")
+                        pass
 
                 # loaded in acc
 
@@ -805,16 +815,19 @@ class CoolAsmGen:
 
                 #  error branch
                 error_branch= "case_without_branch_" + line_number
-                self.append_asm(ASM_Label(error_branch))
-                self.append_asm(ASM_La(acc_reg,f"case_without_branch_string_{line_number}"))
-                self.append_asm(ASM_Syscall("IO.out_string"))
-                self.append_asm(ASM_Syscall("exit"))
+                if line_number not in self.traversed_case_lines:                
+                    self.append_asm(ASM_Label(error_branch))
+                    self.append_asm(ASM_La(acc_reg,f"case_without_branch_string_{line_number}"))
+                    self.append_asm(ASM_Syscall("IO.out_string"))
+                    self.append_asm(ASM_Syscall("exit"))
 
-                # void branch
-                self.append_asm(ASM_Label(void_branch))
-                self.append_asm(ASM_La(acc_reg,f"case_void_string_{line_number}"))
-                self.append_asm(ASM_Syscall("IO.out_string"))
-                self.append_asm(ASM_Syscall("exit"))
+                    # void branch
+                    self.append_asm(ASM_Label(void_branch))
+                    self.append_asm(ASM_La(acc_reg,f"case_void_string_{line_number}"))
+                    self.append_asm(ASM_Syscall("IO.out_string"))
+                    self.append_asm(ASM_Syscall("exit"))
+
+                self.traversed_case_lines.append(line_number)
 
                 end_branch = "case_exp_end_" + self.get_branch_label()
 
@@ -1068,6 +1081,7 @@ class CoolAsmGen:
         else:
             # Self dispatch
             class_name = self.current_class
+
 
         method_name = Method.str
         method_vtable_index = self.method_index.lookup(class_name,method_name)
