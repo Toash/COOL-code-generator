@@ -1,3 +1,5 @@
-From annotated ast, generate [Cool ASM](cool_asm_gen.py). using stack machine instructions 
+known bugs:
 
-From Cool ASM, generate x86.
+chaining concat segfaults
+
+negate not working correctly 
