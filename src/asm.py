@@ -1193,7 +1193,7 @@ class CoolAsmGen:
     # dont need to reserve room for function args, as they are pushed on the stack prior.
     def compute_max_stack_depth(self, exp) -> int:
         # FIXME: Actual compute this
-        return 1000;
+        return 101;
         match exp:
 
             case Block(Body):
