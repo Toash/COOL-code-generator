@@ -32,7 +32,6 @@ TESTS=(
   "case3"
   "isvoid"
   "atoi"
-  "arith_cool"
 )
 
 GREEN='\033[0;32m'

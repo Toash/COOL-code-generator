@@ -21,17 +21,17 @@ def emit_string_constants(asm_instructions: list, x86:bool, string_label:dict)->
 
 # could have been in string constants but whatever
 def emit_dispatch_on_void(asm_instructions: list,line_number:int)->None:
-    asm_instructions.append(ASM_Label(f"dispatch_void_{line_number}"))
+    asm_instructions.append(ASM_Label(f"dispatch_void_string_{line_number}"))
     asm_instructions.append(ASM_Constant_raw_string(f"ERROR: {line_number}: Exception: dispatch on void\\n"))
 
 def emit_case_on_void(asm_instructions: list,line_number:int)->None:
-    asm_instructions.append(ASM_Label(f"case_void_{line_number}"))
+    asm_instructions.append(ASM_Label(f"case_void_string_{line_number}"))
     asm_instructions.append(ASM_Constant_raw_string(f"ERROR: {line_number}: Exception: case on void\\n"))
 
 def emit_case_without_branch(asm_instructions: list,line_number:int)->None:
-    asm_instructions.append(ASM_Label(f"case_without_branch_{line_number}"))
+    asm_instructions.append(ASM_Label(f"case_without_branch_string_{line_number}"))
     asm_instructions.append(ASM_Constant_raw_string(f"ERROR: {line_number}: Exception: case without matching branch\\n"))
 
 def emit_divide_by_zero(asm_instructions: list,line_number:int)->None:
-    asm_instructions.append(ASM_Label(f"divide_by_zero_{line_number}"))
+    asm_instructions.append(ASM_Label(f"divide_by_zero_string_{line_number}"))
     asm_instructions.append(ASM_Constant_raw_string(f"ERROR: {line_number}: Exception: division by zero\\n"))

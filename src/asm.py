@@ -56,6 +56,7 @@ class CoolAsmGen:
             emit_dispatch_on_void(self.asm_instructions,line)
         for line in set(self.case_lines):
             emit_case_on_void(self.asm_instructions,line)
+            emit_case_without_branch(self.asm_instructions,line)
         for line in set(self.div_zero_lines):
             emit_divide_by_zero(self.asm_instructions,line)
 
@@ -573,7 +574,7 @@ class CoolAsmGen:
                     div_ok_label = "div_ok_" + self.get_branch_label()
                     self.append_asm(ASM_Bnz(acc_reg,div_ok_label))
                     # denominnator is zero
-                    self.append_asm(ASM_La(acc_reg, "divide_by_zero_"+denominator_line_number))
+                    self.append_asm(ASM_La(acc_reg, "divide_by_zero_string_"+denominator_line_number))
                     self.append_asm(ASM_Syscall("IO.out_string"))
                     self.append_asm(ASM_Syscall("exit"))
 
@@ -805,13 +806,13 @@ class CoolAsmGen:
                 #  error branch
                 error_branch= "case_without_branch_" + line_number
                 self.append_asm(ASM_Label(error_branch))
-                self.append_asm(ASM_La(acc_reg,f"case_without_branch_{line_number}"))
+                self.append_asm(ASM_La(acc_reg,f"case_without_branch_string_{line_number}"))
                 self.append_asm(ASM_Syscall("IO.out_string"))
                 self.append_asm(ASM_Syscall("exit"))
 
                 # void branch
                 self.append_asm(ASM_Label(void_branch))
-                self.append_asm(ASM_La(acc_reg,f"case_void_{line_number}"))
+                self.append_asm(ASM_La(acc_reg,f"case_void_string_{line_number}"))
                 self.append_asm(ASM_Syscall("IO.out_string"))
                 self.append_asm(ASM_Syscall("exit"))
 
@@ -1032,7 +1033,7 @@ class CoolAsmGen:
 
         # Calling dispatch on void
         if Exp:
-            self.append_asm(ASM_La(acc_reg,f"dispatch_void_{exp_line_number}"))
+            self.append_asm(ASM_La(acc_reg,f"dispatch_void_string_{exp_line_number}"))
             self.append_asm(ASM_Syscall("IO.out_string"))
             self.append_asm(ASM_Syscall("exit"))
 
