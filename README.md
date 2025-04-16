@@ -1,8 +1,6 @@
 known bugs:
 
-chaining concat segfaults
-
-negate not working correctly 
+chaining concat segfaults (not 16 byte aligned before clib function calls)
 
 
 
