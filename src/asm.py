@@ -551,9 +551,16 @@ class CoolAsmGen:
                 self.append_asm(ASM_Push(acc_reg))
 
                 # keep track of these  for divide by zero.
-                if(int(Right[1].Integer) == 0):
-                    # print("zero found at line ",denominator_line_number)
-                    self.div_zero_lines.append(denominator_line_number)
+                denom_is_zero = False
+                if isinstance(Right[1],Integer):
+                    if(int(Right[1].Integer) == 0):
+                        self.div_zero_lines.append(denominator_line_number)
+                        denom_is_zero = True 
+                elif isinstance(Right[1],Negate):
+                    if(int(Right[1].Exp[1].Integer) == 0):
+                        self.div_zero_lines.append(denominator_line_number)
+                        denom_is_zero = True 
+
 
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
@@ -561,7 +568,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
-                if(int(Right[1].Integer) == 0):
+                if denom_is_zero:
                     # check for zero, if not , jump to true branch.
                     div_ok_label = "div_ok_" + self.get_branch_label()
                     self.append_asm(ASM_Bnz(acc_reg,div_ok_label))
