@@ -36,6 +36,7 @@ TESTS=(
   # "cool_hs" hairy scary indeed
   "cool_list"
   "cool_new-complex"
+  "cool_primes"
 )
 
 GREEN='\033[0;32m'

@@ -131,6 +131,9 @@ class CoolAsmGen:
         self.comment("object will be in accumulator.",not_tabbed=True)
         for cls,attrs in self.class_map.items():
             self.current_class = cls 
+            self.symbol_stack.push_scope()
+
+
             self.append_asm(ASM_Label(label=f"{cls}..new"))
             if self.x86:
                 self.append_asm(ASM_Push("fp")) # we will set stack pointer to this later
@@ -203,7 +206,7 @@ class CoolAsmGen:
 
                 # Attribute in acc
                 self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
-
+                self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
 
             self.append_asm(ASM_Mov(acc_reg,self_reg))
 
@@ -215,6 +218,8 @@ class CoolAsmGen:
             if not self.x86:
                 self.append_asm(ASM_Pop("ra"))
             self.append_asm(ASM_Return())
+            
+            self.symbol_stack.pop_scope()
 
 
     def emit_methods(self)->None:
@@ -356,14 +361,17 @@ class CoolAsmGen:
 
             case Assign(Var,Exp):
                 self.cgen(Exp[1])
+                location = self.symbol_stack.lookup_symbol(Var[1])
+                if location is None:
+                    print(f"{Var[1]} could not be found in the  symbol stack!")
 
-                match self.symbol_stack.lookup_symbol(Var[1]):
+                match location: 
                     case Offset(reg,offset):
                         self.append_asm(ASM_St(reg,acc_reg,offset))
                     case Register(reg):
                         self.append_asm(ASM_Mov(reg,acc_reg))
                     case _:
-                        raise Exception("Unhandled symbol location")
+                        raise Exception(f"Unhandled symbol location: {location}" )
 
             case Dynamic_Dispatch(Exp,Method,Args):
                 self.gen_dispatch_helper(Exp=Exp, Type=None, Method=Method, Args=Args)
