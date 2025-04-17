@@ -1073,15 +1073,22 @@ class CoolAsmGen:
 
         if Exp: 
             # Dynamic dispatch
-            class_name = Exp.StaticType
+            if Exp.StaticType== "SELF_TYPE":
+                class_name = self.current_class
+            else:
+                class_name = Exp.StaticType
+            
         elif Type:
             # Static Dispatch
             # Vtable indices are monotonic
+            #TODO: self type?
             class_name = Type[1]
         else:
             # Self dispatch
             class_name = self.current_class
 
+        # print(class_name)
+        # print(Exp)
 
         method_name = Method.str
         method_vtable_index = self.method_index.lookup(class_name,method_name)
