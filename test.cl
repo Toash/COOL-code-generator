@@ -1,84 +1,146 @@
-
 (*
- * methodless-primes.cl
- *
- * Designed by Jesse H. Willett, jhw@cory, 11103234, with 
- *             Istvan Siposs, isiposs@cory, 12342921.
- *
- * This program generates primes in order without using any methods.
- * Actually, it does use three methods: those of IO to print out each
- * prime, and abort() to halt the program.  These methods are incidental,
- * however, to the information-processing functionality of the program.  We
- * could regard the attribute 'out's sequential values as our output, and
- * the string "halt" as our terminate signal.
- *
- * Naturally, using Cool this way is a real waste, basically reducing it 
- * to assembly without the benefit of compilation.  
- *
- * There could even be a subroutine-like construction, in that different
- * code could be in the assign fields of attributes of other classes,
- * and it could be executed by calling 'new Sub', but no parameters
- * could be passed to the subroutine, and it could only return itself.
- * but returning itself would be useless since we couldn't call methods
- * and the only operators we have are for Int and Bool, which do nothing
- * interesting when we initialize them!
- *)
+   This file presents a fairly large example of Cool programming.  The
+class List defines the names of standard list operations ala Scheme:
+car, cdr, cons, isNil, rev, sort, rcons (add an element to the end of
+the list), and print_list.  In the List class most of these functions
+are just stubs that abort if ever called.  The classes Nil and Cons
+inherit from List and define the same operations, but now as
+appropriate to the empty list (for the Nil class) and for cons cells (for
+the Cons class).
 
-class Main inherits IO {
+The Main class puts all of this code through the following silly 
+test exercise:
 
-  main() : Int {	-- main() is an atrophied method so we can parse. 
-    0 
-  };
+   1. prompt for a number N
+   2. generate a list of numbers 0..N-1
+   3. reverse the list
+   4. sort the list
+   5. print the sorted list
 
-  out : Int <-		-- out is our 'output'.  Its values are the primes.
-    {
-      out_string("2 is trivially prime.\n");
-      2;
-    };
+Because the sort used is a quadratic space insertion sort, sorting
+moderately large lists can be quite slow. 
+*)
 
-  testee : Int <- out;	-- testee is a number to be tested for primeness.   
+Class List inherits IO { 
+        (* Since abort() returns Object, we need something of
+	   type Bool at the end of the block to satisfy the typechecker. 
+           This code is unreachable, since abort() halts the program. *)
+	isNil() : Bool { { abort(); true; } };
 
-  divisor : Int;	-- divisor is a number which may factor testee.
+	cons(hd : Int) : Cons {
+	  (let new_cell : Cons <- new Cons in
+		new_cell.init(hd,self)
+	  )
+	};
 
-  stop : Int <- 500;	-- stop is an arbitrary value limiting testee. 	
+	(* 
+	   Since abort "returns" type Object, we have to add
+	   an expression of type Int here to satisfy the typechecker.
+	   This code is, of course, unreachable.
+        *)
+	car() : Int { { abort(); new Int; } };
 
-  m : Object <-		-- m supplants the main method.
-    while true loop 
-      {
+	cdr() : List { { abort(); new List; } };
 
-        testee <- testee + 1;
-        divisor <- 2;
+	rev() : List { cdr() };
 
-        while 
-          if testee < divisor * divisor 
-            then false 		-- can stop if divisor > sqrt(testee).
-	  else if testee - divisor*(testee/divisor) = 0 
-            then false 		-- can stop if divisor divides testee. 
-            else true
-          fi fi     
-        loop 
-          divisor <- divisor + 1
-        pool;        
+	sort() : List { cdr() };
 
-        if testee < divisor * divisor	-- which reason did we stop for?
-        then 	-- testee has no factors less than sqrt(testee).
-          {
-            out <- testee;	-- we could think of out itself as the output.
-            out_int(out); 
-            out_string(" is prime.\n");
-          }
-        else	-- the loop halted on testee/divisor = 0, testee isn't prime.
-          0	-- testee isn't prime, do nothing.
-	fi;   	
+	insert(i : Int) : List { cdr() };
 
-        if stop <= testee then 
-          "halt".abort()	-- we could think of "halt" as SIGTERM.
-        else 
-          "continue"
-        fi;       
+	rcons(i : Int) : List { cdr() };
+	
+	print_list() : Object { abort() };
+};
 
-      } 
-    pool;
+Class Cons inherits List {
+	xcar : Int;  -- We keep the car in cdr in attributes.
+	xcdr : List; 
 
-}; (* end of Main *)
+	isNil() : Bool { false };
+
+	init(hd : Int, tl : List) : Cons {
+	  {
+	    xcar <- hd;
+	    xcdr <- tl;
+	    self;
+	  }
+	};
+	  
+	car() : Int { xcar };
+
+	cdr() : List { xcdr };
+
+	rev() : List { (xcdr.rev()).rcons(xcar) };
+
+	sort() : List { (xcdr.sort()).insert(xcar) };
+
+	insert(i : Int) : List {
+		if i < xcar then
+			(new Cons).init(i,self)
+		else
+			(new Cons).init(xcar,xcdr.insert(i))
+		fi
+	};
+
+
+	rcons(i : Int) : List { (new Cons).init(xcar, xcdr.rcons(i)) };
+
+	print_list() : Object {
+		{
+		     out_int(xcar);
+		     out_string("\n");
+		     xcdr.print_list();
+		}
+	};
+};
+
+Class Nil inherits List {
+	isNil() : Bool { true };
+
+        rev() : List { self };
+
+	sort() : List { self };
+
+	insert(i : Int) : List { rcons(i) };
+
+	rcons(i : Int) : List { (new Cons).init(i,self) };
+
+	print_list() : Object { true };
+
+};
+
+
+Class Main inherits IO {
+
+	l : List;
+
+	(* iota maps its integer argument n into the list 0..n-1 *)
+	iota(i : Int) : List {
+	    {
+		l <- new Nil;
+		(let j : Int <- 0 in
+		   while j < i 
+		   loop 
+		     {
+		       l <- (new Cons).init(j,l);
+		       j <- j + 1;
+		     } 
+		   pool
+		);
+		l;
+	    }
+	};		
+
+	main() : Object {
+	   {
+	     out_string("How many numbers to sort? ");
+	     iota(in_int()).rev().sort().print_list();
+	   }
+	};
+};			    
+
+
+
+
 

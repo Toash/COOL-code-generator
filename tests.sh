@@ -37,6 +37,8 @@ TESTS=(
   "cool_list"
   "cool_new-complex"
   "cool_primes"
+  "cool_print-cool"
+  # "cool_sort-list" this requires input
 )
 
 GREEN='\033[0;32m'
