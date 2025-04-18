@@ -2,7 +2,6 @@ known bugs:
 
 chaining concat segfaults (not 16 byte aligned before clib function calls), the reference   compiler does this as well :/
 
-segfault on cells.cl
 
 Change later:
 
