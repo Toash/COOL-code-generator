@@ -7,6 +7,8 @@ class Main inherits IO{
             -- );
             out_string("Hello world!\n");
             out_string("Hello world!\n");
+            out_string("              X               \n");
+            out_string("              X               ");
             let x:String <- "Hello", y:String <- "Goodbye" in 
             {
                 out_string("\n");
@@ -15,6 +17,10 @@ class Main inherits IO{
                 out_string(x.concat(y));
                 out_string("\n");
                 out_string(y.substr(0,4));
+                out_string("\t");
+                out_string(y.substr(0,1));
+                out_string("\t");
+                out_string(y.substr(0,0));
                 out_string("\t");
                 out_string(x.substr(1,3));
                 out_string("\n");

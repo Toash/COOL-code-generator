@@ -1266,7 +1266,7 @@ class CoolAsmGen:
     # dont need to reserve room for function args, as they are pushed on the stack prior.
     def compute_max_stack_depth(self, exp) -> int:
         # return 101;
-        final_depth = 1
+        final_depth = 0
         match exp:
 
             case Block(Body):
@@ -1302,6 +1302,10 @@ class CoolAsmGen:
             case _:
                 # print("Unhandled in stack analysis:", exp)
                 pass
+
+        # 16 byte alignment
+        if final_depth%2==0:
+            final_depth+=1 
         return final_depth
                 
     def debug(self,reg):
