@@ -1,6 +1,7 @@
 #!/bin/bash
 
 TESTS=(
+  "more_arith"
   "pa3c2"
   "aliasing"
   "case_no_branch1"
@@ -42,6 +43,7 @@ TESTS=(
   "case2"
   "case3"
   "isvoid"
+  # "cool_arith" takes  input
   "cool_atoi"
   "cool_cells"
   # "cool_hs" hairy scary indeed

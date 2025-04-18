@@ -203,7 +203,7 @@ class CoolAsmGen:
                             self.cgen(New(Type=attr.Type, StaticType=attr.Type))
                         else:
                             self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
-                            
+
                 elif attr.Initializer:   
                     exp = attr.Initializer[1]
                     self.cgen(exp)
@@ -239,7 +239,6 @@ class CoolAsmGen:
 
             self.emit_function_prologue(exp)
 
-            self.symbol_stack.push_scope()
 
             # add fields and attributes in scope to symbol table.
 
@@ -283,6 +282,7 @@ class CoolAsmGen:
             self.emit_function_epilogue(stack_cleanup_size)
 
     def emit_function_prologue(self,exp) -> None:
+        self.symbol_stack.push_scope()
         # the cool way
         if not self.x86:
             self.comment("FUNCTION START")
@@ -329,7 +329,6 @@ class CoolAsmGen:
             self.append_asm(ASM_Pop("ra"))
             self.append_asm(ASM_Li(temp_reg,ASM_Word(num_args+self.temporaries_needed+1)))
             self.append_asm(ASM_Add(temp_reg,"sp"))
-            self.symbol_stack.pop_scope()
             self.append_asm(ASM_Return())
         else:
             # stack layout-
@@ -340,6 +339,7 @@ class CoolAsmGen:
             self.append_asm(ASM_Pop("fp"))
             self.append_asm(ASM_Return())
 
+        self.symbol_stack.pop_scope()
         self.temporary_index = 0
 
 
@@ -427,7 +427,9 @@ class CoolAsmGen:
 
 
                 self.comment("WHILE (body)",not_tabbed=True)
+                
                 self.cgen(Body[1])
+
                 # go back to conditional ( the looping part )
                 self.append_asm(ASM_Jmp(while_cond_label))
 
@@ -665,10 +667,17 @@ class CoolAsmGen:
 
 
             case Negate(Exp):
+
                 self.cgen(Exp[1])
-                self.append_asm(ASM_Ld(temp_reg,acc_reg,attributes_start_index))
-                self.append_asm(ASM_Li(temp2_reg,ASM_Value(-1)))
-                self.append_asm(ASM_Mul(temp2_reg,temp_reg))
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Li(temp_reg,ASM_Value(0)))
+                self.append_asm(ASM_Sub(acc_reg,temp_reg))
+                
+                # IMPORTANT:  THIS IS ASSUMING NEW INT  DOES NOT USE r3
+                self.append_asm(ASM_Mov(temp2_reg,temp_reg))
+
+                self.cgen(New(Type="Int",StaticType="Int"))
+                self.append_asm(ASM_Mov(temp_reg,temp2_reg))
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
 
 
