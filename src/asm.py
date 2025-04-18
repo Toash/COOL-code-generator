@@ -763,6 +763,8 @@ class CoolAsmGen:
                 self.symbol_stack.pop_scope()
 
 
+
+            # no init  binding
             case Let_No_Init(Var,Type):
                 var = Var[1]
                 if Type.str == "Int" or Type.str == "String" or Type.str == "Bool":
@@ -776,6 +778,7 @@ class CoolAsmGen:
                 self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
 
+            # init binding
             case Let_Init(Var,Type,Exp):
                 var = Var[1]
                 self.cgen(Exp[1])
@@ -1262,37 +1265,44 @@ class CoolAsmGen:
     # for example, each let binding needs room on the stack.
     # dont need to reserve room for function args, as they are pushed on the stack prior.
     def compute_max_stack_depth(self, exp) -> int:
-        # FIXME: Actual compute this
-        return 101;
+        # return 101;
+        final_depth = 1
         match exp:
 
             case Block(Body):
-                return max(self.compute_max_stack_depth(e[1]) for e in Body)
+                final_depth += max(self.compute_max_stack_depth(e[1]) for e in Body)
 
             case Let(Bindings, Body):
                 binding_depth = len(Bindings)
                 # recursively calculate depth of body while adding binding_depth
                 total_depth = binding_depth+ self.compute_max_stack_depth(Body[1])
-                return total_depth        
+                final_depth += total_depth        
+
+            case Case(Exp,Elements):
+                depth = 1 # for exp
+                total_depth = depth + len(Elements)
+                final_depth += total_depth 
 
             case If(Predicate, Then, Else):
                 then_depth = self.compute_max_stack_depth(Then[1])
                 else_depth = self.compute_max_stack_depth(Else[1])
-                return max(then_depth, else_depth)
+                final_depth += max(then_depth, else_depth)
 
             case While(Predicate,Body):
                 body_depth = self.compute_max_stack_depth(Body[1])
-                return body_depth
-            
-            # TODO: is this actually correct
-            case Case(Exp,Elements):
-                depth = 1 # for exp
-                total_depth = depth + len(Elements)
-                return depth
+                final_depth += body_depth
 
+            # case Dynamic_Dispatch(Body) | Static_Dispatch(Body) | Self_Dispatch(Body):
+            case Self_Dispatch(Method,Args):
+                final_depth += self.compute_max_stack_depth(Method[1]) 
+            case Dynamic_Dispatch(Exp,Method,Args):
+                final_depth += self.compute_max_stack_depth(Method[1]) 
+            case Static_Dispatch(Exp,Type,Method,Args):
+                final_depth += self.compute_max_stack_depth(Method[1]) 
             case _:
                 # print("Unhandled in stack analysis:", exp)
-                return 0
+                pass
+        return final_depth
                 
     def debug(self,reg):
         self.asm_instructions.append(ASM_Debug(reg))
