@@ -2,6 +2,7 @@ known bugs:
 
 chaining concat segfaults (not 16 byte aligned before clib function calls)
 
+arith.cl segfaults  on x86
 
 
 Change later:
