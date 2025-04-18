@@ -12,7 +12,6 @@ from asm_locations import *
 from asm_method_index import *
 from asm_string_to_label import *
 from asm_tags import *
-import uuid
 
 class CoolAsmGen:
     def __init__(self, file, x86=False):
@@ -41,7 +40,9 @@ class CoolAsmGen:
 
         # Used to generate dispatch on void labels
         self.dispatch_lines = []
-        self.case_lines=[]
+
+        # expression and line number for case statement
+        self.case_lines_and_exps=[]
         # used to keep track of the lines that we emitted case statements for
         #  TODO: delete this when i only emit  the necessary methods
         self.traversed_case_lines=[]
@@ -62,9 +63,9 @@ class CoolAsmGen:
 
         for line in set(self.dispatch_lines):
             emit_dispatch_on_void(self.asm_instructions,line)
-        for line in set(self.case_lines):
+        for line,exp in set(self.case_lines_and_exps):
             emit_case_on_void(self.asm_instructions,line)
-            emit_case_without_branch(self.asm_instructions,line)
+            emit_case_without_branch(self.asm_instructions,line,exp)
         for line in set(self.div_zero_lines):
             emit_divide_by_zero(self.asm_instructions,line)
 
@@ -198,8 +199,11 @@ class CoolAsmGen:
                         self.comment(f"Store raw string for attribute in String.")
                         self.append_asm(ASM_La(acc_reg,"the.empty.string"))
                     else:
-                        # FIXME: other objects correctly
-                        self.cgen(New(Type=attr.Type, StaticType=attr.Type))
+                        if attr.Type == "Int" or attr.Type == "String" or attr.Type == "Bool":
+                            self.cgen(New(Type=attr.Type, StaticType=attr.Type))
+                        else:
+                            self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
+                            
                 elif attr.Initializer:   
                     exp = attr.Initializer[1]
                     self.cgen(exp)
@@ -439,6 +443,7 @@ class CoolAsmGen:
             case New(Type):
                 if isinstance(Type,ID):
                     Type = Type[1]
+
                 self.append_asm(ASM_Push("fp"))
                 self.append_asm(ASM_Push(self_reg))
                 # going to put result in ra register.
@@ -773,6 +778,8 @@ class CoolAsmGen:
             case Case(Exp, Elements):
                 self.symbol_stack.push_scope()
                 line_number = Exp[0]
+                exp = Exp[1] # expression we are comparingg all of the branches to
+                exp_type = exp.StaticType 
                 void_branch = "case_void_branch_" + line_number
 
                 # from pprint import pprint
@@ -780,7 +787,7 @@ class CoolAsmGen:
                 # pprint(Elements)
 
                 # Generate the expression
-                self.case_lines.append(line_number)
+                self.case_lines_and_exps.append((line_number,exp))
                 self.cgen(Exp[1])
                 self.append_asm(ASM_Bz(acc_reg,void_branch))
 
@@ -815,17 +822,19 @@ class CoolAsmGen:
                             case_exp_label = temp_class_name_to_label[parent_name]
                             self.append_asm(ASM_Beq(acc_reg,temp_reg,case_exp_label))
 
+                no_branch= f"case_without_branch_{line_number}_{exp_type}" 
+
                 # case without branch (everyhting else)
                 for class_name, tag in self.class_to_tag.get_dict().items():
                     if class_name not in temp_class_name_to_label:
                         self.append_asm(ASM_Li(temp_reg,ASM_Value(tag)))
-                        self.append_asm(ASM_Beq(acc_reg,temp_reg,f"case_without_branch_{line_number}"))
+                        self.append_asm(ASM_Beq(acc_reg,temp_reg,no_branch))
 
-                #  error branch
-                error_branch= "case_without_branch_" + line_number
+
+                # FIXME include exp in traversed
                 if line_number not in self.traversed_case_lines:                
-                    self.append_asm(ASM_Label(error_branch))
-                    self.append_asm(ASM_La(acc_reg,f"case_without_branch_string_{line_number}"))
+                    self.append_asm(ASM_Label(no_branch))
+                    self.append_asm(ASM_La(acc_reg,f"case_without_branch_string_{line_number}_{exp_type}"))
                     self.append_asm(ASM_Syscall("IO.out_string"))
                     self.append_asm(ASM_Syscall("exit"))
 

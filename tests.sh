@@ -1,6 +1,17 @@
 #!/bin/bash
 
 TESTS=(
+  "pa3c2"
+  "aliasing"
+  "case_no_branch1"
+  "case_no_branch2"
+  "case_no_branch3"
+  "case_no_branch4"
+  "dispatch-selftype-sideeffect"
+  "div_by_zero"
+  "str_out_of_bounds"
+  "void_case"
+  "void_dispatch"
   "arith"
   "divide_by_zero"
   "assignment"
