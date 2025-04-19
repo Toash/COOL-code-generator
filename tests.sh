@@ -1,6 +1,7 @@
 #!/bin/bash
 
 TESTS=(
+  "book_list"
   "staircase"
   "more_arith"
   "pa3c2"
@@ -67,7 +68,10 @@ for test in "${TESTS[@]}"; do
   gcc -no-pie -static ./tests/$test.s -o my_out
   ./my_out > my_output.txt
 
-  cool "./tests/$test.cl" > ref_output.txt
+  # cool "./tests/$test.cl" > ref_output.txt
+  cool --x86 "./tests/$test.cl" 
+  gcc -no-pie -static ./tests/$test.s -o ref_output 
+  ./ref_output > ref_output.txt
 
   if diff -q my_output.txt ref_output.txt > /dev/null; then
     echo -e "${GREEN}[PASS]${NC} $test"
@@ -82,5 +86,6 @@ done
 
 rm my_out
 rm my_output.txt
+rm ref_output
 rm ref_output.txt
 rm -rf ./src/__pycache__

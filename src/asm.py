@@ -799,7 +799,7 @@ class CoolAsmGen:
                 # pprint(Elements)
 
                 # Generate the expression
-                self.case_lines_and_exps.append((line_number,exp))
+                self.case_lines_and_exps.append((line_number,exp_type))
                 self.cgen(Exp[1])
                 self.append_asm(ASM_Bz(acc_reg,void_branch))
 
