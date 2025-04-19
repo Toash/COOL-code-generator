@@ -65,6 +65,12 @@ class X86Gen:
             self.outfile.write("\t\t")
         self.outfile.write(string)
 
+    # makes last 4 bits of rsp 0, so 16 byte aligns rsp
+
+    def align_rsp(self):
+        self.write("## 16 byte align rsp before call\n")
+        self.write("andq\t $0xFFFFFFFFFFFFFFF0, %rsp\n")
+
     def cool_asm_to_x86(self,cool_asm):
         for instr in cool_asm:
             match instr:
@@ -179,6 +185,8 @@ class X86Gen:
                             # accumulator should hold the value we want to print.
                             self.write("movq\t %r13, %rsi\n")
                             self.write("movl\t $0, %eax\t## required by printf.\n")
+
+                            self.align_rsp()
                             self.write("call\t printf\n")
                         case "IO.in_int":
                             self.write("## in_int\n")
@@ -188,6 +196,7 @@ class X86Gen:
                             self.write("## Generate array of 4096 chars\n")
 
                             # generate array of 4096 characters where string will be stored.
+                            self.align_rsp()
                             self.write("call\t calloc\n")
                             self.write("pushq\t %rax\n")
                             # im starting to regret these tabs
@@ -203,6 +212,8 @@ class X86Gen:
                             self.write("## rdi - char array\n")
                             self.write("## rsi - number of characters to read (4096)\n")
                             self.write("## rdx - the stream to read from (stdin)\n")
+                            
+                            self.align_rsp()
                             self.write("call\t fgets\n")
 
                             self.write("popq\t %rdi\n")
@@ -224,6 +235,7 @@ class X86Gen:
                             self.write("## rdx - output stream\n")
 
 
+                            self.align_rsp()
                             self.write("call\t sscanf\n")
                             # inputted integer now in rax.
                             self.write("popq\t %rax\n")
@@ -238,10 +250,12 @@ class X86Gen:
                         case "IO.out_string":
                             self.write("## out_string\n")
                             self.write("movq\t %r13, %rdi ## move string pointer (just raw value in a String object) to rdi.\n")
+                            self.align_rsp()
                             self.write("call\t cooloutstr\n")
 
                         case "IO.in_string":
                             self.write("## in_string\n")
+                            self.align_rsp()
                             self.write("call\t coolgetstr\n")
                             self.write("movq\t %rax, %r13\n")
 
@@ -255,6 +269,7 @@ class X86Gen:
                             self.write("movq\t %r13, %rdi\n")
                             self.write("movq\t %r14, %rsi\n")
                             self.write("## String.concat\n")
+                            self.align_rsp()
                             self.write("call coolstrcat\n")
 
                             # modify the combined stinrg we made earlier.
@@ -266,6 +281,7 @@ class X86Gen:
                             self.write("movq\t %r13, %rsi\n")
                             # ending index
                             self.write("movq\t %r14, %rdx\n")
+                            self.align_rsp()
                             self.write("call\t coolsubstr\n")
                             self.write("movq\t %rax, %r13\n")
 
@@ -273,6 +289,7 @@ class X86Gen:
                         case "string_compare_eq":
                             self.write("movq\t %r13, %rdi\n")
                             self.write("movq\t %r14, %rsi\n")
+                            self.align_rsp()
                             self.write("call\t strcmp\n")
                             self.write("cmp\t $0, %eax\n")
                             self.write("je\t eq_true\n")
@@ -280,6 +297,7 @@ class X86Gen:
                         case "string_compare_le":
                             self.write("movq\t %r13, %rdi\n")
                             self.write("movq\t %r14, %rsi\n")
+                            self.align_rsp()
                             self.write("call\t strcmp\n")
                             self.write("cmp\t $0, %eax\n")
                             self.write("jle\t le_true\n")
@@ -287,6 +305,7 @@ class X86Gen:
                         case "string_compare_lt":
                             self.write("movq\t %r13, %rdi\n")
                             self.write("movq\t %r14, %rsi\n")
+                            self.align_rsp()
                             self.write("call\t strcmp\n")
                             self.write("cmp\t $0, %eax\n")
                             self.write("jl\t lt_true\n")
