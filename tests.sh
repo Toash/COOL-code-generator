@@ -1,6 +1,7 @@
 #!/bin/bash
 
 TESTS=(
+  "staircase"
   "more_arith"
   "pa3c2"
   "aliasing"
