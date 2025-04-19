@@ -240,17 +240,11 @@ class CoolAsmGen:
 
             # step 1 - fields / attr in scope
             for index,attr in enumerate(self.class_map[cname],start=attributes_start_index):
-                if index==attributes_start_index:
-                    self.comment("Setting up addresses for attributes (based off offsets from self reg)")
-                self.comment(f"Setting up attribute, it lives in {self_reg}[{index}]")
+                self.comment(f"SYMBOL TABLE: setup attr {attr.Name}, lives in {self_reg}[{index}]")
                 self.symbol_stack.insert_symbol(attr.Name , Offset(self_reg, index))
 
             # step 2 - formals in scope
             for index,arg in enumerate(imp[:-1],start=1):
-                if index == 1:
-                    self.comment("Getting args.")
-
-
                 if self.x86:
                     # + 1 because of return address
                     # + 1 because of self object
@@ -264,14 +258,11 @@ class CoolAsmGen:
                     # + 1 to get the actual index
                     fp_offset=num_args-index + 1 + 1
 
-                self.comment(f"Add argument {arg} to symbol table, it lives in fp[{fp_offset}]")
+                self.comment(f"SYMBOL TABLE: setup formal {arg}, it lives in fp[{fp_offset}]")
                 self.symbol_stack.insert_symbol(arg, Offset("fp", fp_offset))
 
 
-            self.append_asm(ASM_Comment("start code-genning method body"))
             self.cgen(exp)
-            self.append_asm(ASM_Comment("done code-genning method body"))
-
 
             # args  (this only matters for cool)
             stack_cleanup_size=num_args
@@ -290,9 +281,10 @@ class CoolAsmGen:
 
             # we use negative indices to refer to temporaries in the current procedures.
             #   ( let bindings , etc.)
-            self.append_asm(ASM_Comment("Stack room for temporaries"))
             self.temporaries_needed= self.compute_max_stack_depth(exp)
+            self.append_asm(ASM_Comment(f"Stack room for {self.temporaries_needed} temporaries"))
             # we need to do +1 beacuse we popped r0, the reference compiler is confusing... 
+            self.append_asm(ASM_Comment(f"+1 because we popped r0"))
             self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed+1)))
             self.append_asm(ASM_Sub(temp_reg,"sp"))
 
@@ -354,15 +346,18 @@ class CoolAsmGen:
         match exp:
 
             case Assign(Var,Exp):
+                var = Var[1]
                 self.cgen(Exp[1])
                 location = self.symbol_stack.lookup_symbol(Var[1])
                 if location is None:
-                    print(f"{Var[1]} could not be found in the  symbol stack!")
+                    raise Exception(f"{var} could not be found in the  symbol stack!")
 
                 match location: 
                     case Offset(reg,offset):
+                        self.comment(f"SYMBOL TABLE: update {var} in register {reg}")
                         self.append_asm(ASM_St(reg,acc_reg,offset))
                     case Register(reg):
+                        self.comment(f"SYMBOL TABLE: update {var} in register {reg}")
                         self.append_asm(ASM_Mov(reg,acc_reg))
                     case _:
                         raise Exception(f"Unhandled symbol location: {location}" )
@@ -680,18 +675,16 @@ class CoolAsmGen:
 
                 match self.symbol_stack.lookup_symbol(var):
                     case Register(reg):
-                        self.comment(f"Found variable {var} in register {reg}")
+                        self.comment(f"SYMBOL TABLE: found {var} in register {reg}")
                         self.append_asm(ASM_Mov(dest = acc_reg, src = reg))
                     case Offset(reg,offset):
-                        self.comment(f"Found variable {var} in register {reg} at offset {offset}")
+                        self.comment(f"SYMBOL TABLE: found {var} in register {reg} at offset {offset}")
                         if not self.x86:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                         else:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                     case _:
-                        # raise Exception(f"Could not find identifier {var}!")
-                        #print(f"Could not find identifier {var}!")
-                        pass
+                        raise Exception(f"Could not find identifier {var}!")
 
                 # loaded in acc
 
