@@ -10,6 +10,8 @@
 *.s
 examples
 testcases
+more_tests
+more_tests.sh
 
 # for reference
 COOL_REFERENCE

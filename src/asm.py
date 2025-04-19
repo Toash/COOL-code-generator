@@ -12,6 +12,7 @@ from asm_locations import *
 from asm_method_index import *
 from asm_string_to_label import *
 from asm_tags import *
+from pprint import pprint
 
 class CoolAsmGen:
     def __init__(self, file, x86=False):
@@ -98,7 +99,6 @@ class CoolAsmGen:
 
 
     def emit_vtables(self) -> None:
-        self.comment("VIRTUAL TABLES",not_tabbed=True)
         for cls in self.class_map:
             self.append_asm(ASM_Label(label = f"{cls}..vtable"))
 
@@ -128,8 +128,7 @@ class CoolAsmGen:
             self.method_index.reset_index()
 
     def emit_constructors(self) -> None:
-        self.comment("CONSTRUCTORS",not_tabbed=True)
-        self.comment("object will be in accumulator.",not_tabbed=True)
+        self.comment("resulting object will be in accumulator.",not_tabbed=True)
         for cls,attrs in self.class_map.items():
             self.current_class = cls 
             self.symbol_stack.push_scope()
@@ -144,6 +143,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_Push("ra"))
 
 
+            # FIXME: is this actually needed?
             if self.x86:
                 self.comment("stack offset for 16 byte alignment")
                 self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
@@ -155,7 +155,6 @@ class CoolAsmGen:
             # indexes are in asm_constants.py
             size = len(attrs) + 3
 
-            self.comment(f"allocating {size} words of memory for object layout for class {cls}.")
             self.append_asm(ASM_Li(reg = self_reg, imm = ASM_Value(size)))
             self.append_asm(ASM_Alloc(dest = self_reg, src = self_reg))
 
@@ -215,7 +214,6 @@ class CoolAsmGen:
             self.append_asm(ASM_Mov(acc_reg,self_reg))
 
 
-            self.comment("cleanup stuff")
             if self.x86:
                 self.append_asm(ASM_Mov("sp","fp"))
                 self.append_asm(ASM_Pop("fp"))
@@ -227,8 +225,6 @@ class CoolAsmGen:
 
 
     def emit_methods(self)->None:
-        self.comment("METHODS",not_tabbed=True)
-
 
         # for (cname,mname), imp in self.direct_methods.items():
         for (cname,mname), imp in self.imp_map.items():
@@ -285,10 +281,7 @@ class CoolAsmGen:
         self.symbol_stack.push_scope()
         # the cool way
         if not self.x86:
-            self.comment("FUNCTION START")
             self.append_asm(ASM_Mov("fp","sp"))
-            self.comment("Presumably, caller has pushed arguments,then receiver object on stack.")
-            self.comment("Load receiver object into r0 (receiver object is on top of stack).")
             self.append_asm(ASM_Pop(self_reg))
 
             # --=-=-=-=-=-=- temporaries -==-==-=-=-=--=-=-
@@ -307,7 +300,6 @@ class CoolAsmGen:
 
         else:
             # the x86 way
-            self.comment("IN X86 - RETURN ADDRESS HAD BETTER BE BEFORE THIS FRAME POINTER OR ELSE BAD THINGS WILL HAPPEN")
             self.append_asm(ASM_Push("fp"))
             self.append_asm(ASM_Mov(dest="fp",src="sp"))
             # +1 for pushed rbp
@@ -315,14 +307,13 @@ class CoolAsmGen:
             # +1 for the actual self object that we are getting
             self.append_asm(ASM_Ld(self_reg,"sp",2))
 
-            self.comment("Temporaries")
             self.temporaries_needed= self.compute_max_stack_depth(exp)
+            self.comment(f"need {self.temporaries_needed} temporaries")
             self.append_asm(ASM_Li(temp_reg,ASM_Word(self.temporaries_needed)))
             self.append_asm(ASM_Sub(temp_reg,"sp"))
 
 
     def emit_function_epilogue(self,num_args) -> None:
-        self.comment("FUNCTION CLEANUP")
         if not self.x86:
             # stack layout-
             #   arg1 .. n
@@ -358,7 +349,6 @@ class CoolAsmGen:
     leave stack the way we found it
     """
     def cgen(self, exp)->None:
-        
         self.comment(f"cgen+: {exp}")
 
         match exp:
@@ -479,25 +469,19 @@ class CoolAsmGen:
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Load unboxed integers.")
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
                     offset = attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
-                self.comment("Add unboxed integers.")
                 self.append_asm(ASM_Add(acc_reg,temp_reg))
 
-                self.comment("Push result of adding on the stack.")
                 self.append_asm(ASM_Push(temp_reg))
 
-                self.comment("Create new Int Object.")
                 self.cgen(New(Type="Int", StaticType="Int"))
-                self.comment("Pop previously saved addition result off of stack.")
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Store unboxed int inside new Int Object.")
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
@@ -511,26 +495,20 @@ class CoolAsmGen:
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Load unboxed integers.")
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
                     offset = attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
-                self.comment("Subtract unboxed integers.")
                 self.append_asm(ASM_Sub(acc_reg,temp_reg))
 
 
-                self.comment("Push result of subtracting on the stack.")
                 self.append_asm(ASM_Push(temp_reg))
 
-                self.comment("Create new Int Object.")
                 self.cgen(New(Type="Int", StaticType="Int"))
-                self.comment("Pop previously saved subtraction result off of stack.")
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Store unboxed int inside new Int Object.")
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
@@ -544,25 +522,19 @@ class CoolAsmGen:
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Load unboxed integers.")
                 self.append_asm(ASM_Ld(
                     dest = acc_reg,
                     src = acc_reg,
                     offset = attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
-                self.comment("Multiply unboxed integers.")
                 self.append_asm(ASM_Mul(acc_reg,temp_reg))
 
-                self.comment("Push result of multiplying on the stack.")
                 self.append_asm(ASM_Push(temp_reg))
 
-                self.comment("Create new Int Object.")
                 self.cgen(New(Type="Int", StaticType="Int"))
-                self.comment("Pop previously saved multiplication result off of stack.")
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Store unboxed int inside new Int Object.")
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
@@ -589,7 +561,6 @@ class CoolAsmGen:
 
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
-                self.comment("Load unboxed integers.")
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
@@ -604,18 +575,13 @@ class CoolAsmGen:
 
                     self.append_asm(ASM_Label(div_ok_label))
 
-                self.comment("Divide unboxed integers.")
                 self.append_asm(ASM_Div(acc_reg,temp_reg))
 
-                self.comment("Push result of dividing on the stack.")
                 self.append_asm(ASM_Push(temp_reg))
 
-                self.comment("Create new Int Object.")
                 self.cgen(New(Type="Int", StaticType="Int"))
-                self.comment("Pop previously saved division result off of stack.")
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.comment("Store unboxed int inside new Int Object.")
                 self.append_asm(ASM_St(
                     dest = acc_reg,
                     src = temp_reg,
@@ -649,7 +615,6 @@ class CoolAsmGen:
                         raise Exception("Unknown conditional expression:", exp)
 
                 if self.x86:
-                    self.comment("x86- deallocate two args and self.")
                     self.append_asm(ASM_Li(temp_reg,ASM_Word(3)))
                     self.append_asm(ASM_Add(temp_reg,"sp"))
                 # CLEANUP
@@ -682,12 +647,7 @@ class CoolAsmGen:
 
 
             case Integer(Integer=val, StaticType=st):
-                # make new int , (default initialized with 0)
                 self.cgen(New(Type="Int",StaticType="Int"))
-
-                # access secrete fields :)
-                # this depends on the fact that the location of the raw int is the first attribute index.
-                self.comment(f"put {val} in the first attribute for a Cool Int Object :)")
                 self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
                 self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
                 # Integer object now in accumulator register.
@@ -752,11 +712,11 @@ class CoolAsmGen:
                 self.symbol_stack.push_scope()
 
 
-                self.comment("Code generating let bindings.")
+                self.comment("Let bindings")
                 for binding in Bindings:
                     self.cgen(binding)
 
-                self.comment("Code generating let body.")
+                self.comment("Let body")
                 self.cgen(Body[1])
 
                 self.temporary_index = 0
@@ -773,7 +733,7 @@ class CoolAsmGen:
                     # Other objects
                     self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
 
-                self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
+                self.comment(f"Store let no init binding in fp[{self.temporary_index}]")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
@@ -782,7 +742,7 @@ class CoolAsmGen:
             case Let_Init(Var,Type,Exp):
                 var = Var[1]
                 self.cgen(Exp[1])
-                self.comment(f"Storing default value for  {Type.str} as offset from frame pointer.")
+                self.comment(f"Store let init binding in fp[{self.temporary_index}]")
                 self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
                 self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
                 self.temporary_index -= 1
@@ -790,6 +750,7 @@ class CoolAsmGen:
             case Case(Exp, Elements):
                 self.symbol_stack.push_scope()
                 line_number = Exp[0]
+                self.comment("Case expression (what branches will compare to)")
                 exp = Exp[1] # expression we are comparingg all of the branches to
                 exp_type = exp.StaticType 
                 void_branch = "case_void_branch_" + line_number
@@ -927,7 +888,6 @@ class CoolAsmGen:
                         # in the case of out_int, x should be an integer.
                         self.cgen(Identifier(Var="x", StaticType=None))
 
-                        self.comment("Load unboxed int.")
                         self.append_asm(ASM_Ld(acc_reg, acc_reg, attributes_start_index))
 
                         self.append_asm(ASM_Syscall(Body))
@@ -945,7 +905,6 @@ class CoolAsmGen:
                     case "IO.out_string":
                         self.cgen(Identifier(Var="x", StaticType="String"))
 
-                        self.comment("Load unboxed string")
                         self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                         self.append_asm(ASM_Syscall(Body))
 
@@ -1066,11 +1025,6 @@ class CoolAsmGen:
             non_void_label = "non_void_"+self.get_branch_label()
             self.append_asm(ASM_Bnz(acc_reg,non_void_label))
             self.dispatch_lines.append(exp_line_number)
-        else:
-            # self dispatch
-            # object on which current method is invoked.
-            self.comment("Move receiver to accumulator.")
-            self.append_asm(ASM_Mov(acc_reg,self_reg))
 
 
         # Calling dispatch on void
@@ -1081,8 +1035,14 @@ class CoolAsmGen:
 
         if Exp:
             self.append_asm(ASM_Label(non_void_label))
+        
         self.comment("Push receiver on the stack.")
-        self.append_asm(ASM_Push(acc_reg))
+        if Exp:
+            # push code generated receiver
+            self.append_asm(ASM_Push(acc_reg))
+        else:
+            # push self receiver
+            self.append_asm(ASM_Push(self_reg))
 
 
         """
@@ -1094,11 +1054,12 @@ class CoolAsmGen:
         # receiver object in acc.
         # e.g: someone wants to invoke "out_int" or "main"
         # emit code to lookup in vtable.
-        self.comment("Loading v table.")
         if Type:
             self.append_asm(ASM_La(temp_reg, f"{Type[1]}..vtable"))
-        else:
+        elif Exp:
             self.append_asm(ASM_Ld(dest=temp_reg, src=acc_reg, offset=vtable_index))
+        else:
+            self.append_asm(ASM_Ld(dest=temp_reg, src=self_reg, offset=vtable_index))
 
         if Exp: 
             # Dynamic dispatch
@@ -1124,7 +1085,6 @@ class CoolAsmGen:
 
         self.comment(f"{class_name}.{method_name} lives at vindex {method_vtable_index}, loading the address.")
         self.append_asm(ASM_Ld(temp_reg, temp_reg, method_vtable_index))
-        self.comment(f"Indirectly call the method.")
         self.append_asm(ASM_Call_Reg(temp_reg))
 
 
@@ -1132,7 +1092,6 @@ class CoolAsmGen:
         # cant do this in x86, the return address is in the way.
         # so we do it in the caller, where the return address has already been popped off by ret.
         if self.x86:
-            self.comment(f"x86- clean up stack.")
             self.append_asm(ASM_Li(temp_reg,ASM_Word(len(Args)+1)))
             self.append_asm(ASM_Add(temp_reg,"sp"))
 
@@ -1306,6 +1265,7 @@ class CoolAsmGen:
         # 16 byte alignment
         if final_depth%2==0:
             final_depth+=1 
+
         return final_depth
                 
     def debug(self,reg):
