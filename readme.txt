@@ -1,6 +1,18 @@
 My compiler just uses cl-asm as an ir. I skipped TAC because it wasn't fully working 
 and I wanted to start printing 1 to the screen quickly.
 
+Some quirks of cl-asm: 
+to deallocate passed variables, it adds to rsp inside the function call itself. 
+this made it particularly tricky to follow, because as parameters were 
+being pushed, you had to be implicitly aware that deallocating these parameters were happening 
+elsewhere. Instead in x86, I could not do this since the return address was in the way
+so i did it immediately after the call which made it way more readable. 
+
+it also adds to rsp to deallocate the space for temporaries but in x86 we can just set rsp to rbp.
+
+Theres probably more to mention, but to handle all of this I just created a bool in the cl-asm generator,
+which would generate x86 equivalents instead.
+
 Some benefits of using cl-asm were that if the generated assembly was segfaulting, 
 I could quickly run the .cl-asm version, and if it worked, most of the time meant that  
 there were issues with 16 byte alignment.
