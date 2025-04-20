@@ -2,6 +2,7 @@ import sys
 from asm import CoolAsmGen
 from asm_instructions import *
 from x86_strings import *
+from x86_ints import *
 
 
 # given cl-type, parses cl-type, converts to cool-asm, then to x86.
@@ -55,6 +56,19 @@ class X86Gen:
             emit_coolgetstr_check_null_char(self.outfile)
             emit_coolgetstr_store_char(self.outfile)
             emit_coolgetstr_return(self.outfile)
+
+            emit_coolinint(self.outfile)
+            emit_coolinint_read_success(self.outfile)
+            emit_coolinint_advance_pointer(self.outfile)
+            emit_coolinint_skip_whitespace(self.outfile)
+            emit_coolinint_null(self.outfile)
+            emit_coolinint_parse_int(self.outfile)
+            emit_coolinint_int_out_of_range(self.outfile)
+            emit_coolinint_newline_continue(self.outfile)
+            emit_coolinint_skip_newline_check(self.outfile)
+            emit_coolinint_return_result(self.outfile)
+            emit_coolinint_function_exit(self.outfile)
+            emit_coolinint_check_canary_passed(self.outfile)
 
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
@@ -190,63 +204,10 @@ class X86Gen:
                             self.write("call\t printf\n")
                         case "IO.in_int":
                             self.write("## in_int\n")
-                            self.write("movl\t $1, %esi\n")
-                            self.write("movl\t $4096, %edi\n")
-                            
-                            self.write("## Generate array of 4096 chars\n")
-
-                            # generate array of 4096 characters where string will be stored.
                             self.align_rsp()
-                            self.write("call\t calloc\n")
-                            self.write("pushq\t %rax\n")
-                            # im starting to regret these tabs
-                            self.write("movq\t %rax, %rdi\n")
-                            self.write("movq\t $4096, %rsi\n")
-
-                            self.write("## put stdin stream into %rdx.\n")
-
-                            # the stream
-                            self.write("movq\t stdin(%rip), %rdx\n")
-                            
-                            self.write("## fgets has\n")
-                            self.write("## rdi - char array\n")
-                            self.write("## rsi - number of characters to read (4096)\n")
-                            self.write("## rdx - the stream to read from (stdin)\n")
-                            
-                            self.align_rsp()
-                            self.write("call\t fgets\n")
-
-                            self.write("popq\t %rdi\n")
-                            self.write("movl\t $0, %eax\n")
-                            self.write("pushq\t %rax\n")
-
-                            # sscanf will write to top of stack.
-                            self.write("## sscanf will write to top of stack.\n")
-
-                            self.write("movq\t %rsp, %rdx\n")
-                            self.write("movq\t $percent.ld, %rsi\n")
-
-                            # with the ld placeholder, only parse an integer from the input string.
-                            self.write("## with placeholder, only parse integer from input string.\n")
-
-                            self.write("## sscanf has:\n")
-                            self.write("## rdi - char array\n")
-                            self.write("## rsi - placeholders\n")
-                            self.write("## rdx - output stream\n")
-
-
-                            self.align_rsp()
-                            self.write("call\t sscanf\n")
-                            # inputted integer now in rax.
-                            self.write("popq\t %rax\n")
-                            self.write("movq\t $0, %rsi\n")
-                            # clamp to 32 bit signed int range.
-                            self.write("cmpq\t $2147483647, %rax\n")
-                            self.write("cmovg\t %rsi, %rax\n")
-                            self.write("cmpq\t $-2147483648, %rax\n")
-                            self.write("cmovl\t %rsi, %rax\n")
+                            self.write("call\t coolinint\n")
                             self.write("movq\t %rax, %r13\n")
-                            self.write("## we now have the raw value in %r13.\n")
+
                         case "IO.out_string":
                             self.write("## out_string\n")
                             self.write("movq\t %r13, %rdi ## move string pointer (just raw value in a String object) to rdi.\n")
