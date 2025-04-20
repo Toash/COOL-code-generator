@@ -58,6 +58,7 @@ test1 one just does a lot of arithmetic,
 this test case caught a lot of bugs, in particular, i was not updating the Integer
 object correctly when negating, and when dividing by zero, I was checking if the denominator
 was zero, but was falsy assuming that it was always an Integer and not a Plus, Minus, etc...
+i ended up just cgenning and branching if non zero to okay branch.
 
 test2 checks for scoping, in particular when we go into a let expression body, the bindings
 are defined and shadow over any ones that were declared before it, and when exiting the 
