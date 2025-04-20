@@ -1247,9 +1247,11 @@ class CoolAsmGen:
                 final_depth += total_depth        
 
             case Case(Exp,Elements):
-                depth = 1 # for exp
-                total_depth = depth + len(Elements)
-                final_depth += total_depth 
+                # we dont actually need this
+                # depth = 1 # for exp
+                # total_depth = depth + len(Elements)
+                # final_depth += total_depth 
+                final_depth += 1
 
             case If(Predicate, Then, Else):
                 then_depth = self.compute_max_stack_depth(Then[1])
@@ -1271,9 +1273,10 @@ class CoolAsmGen:
                 # print("Unhandled in stack analysis:", exp)
                 pass
 
+        # we dont need this, we are already handling alignment in the built_in with andq
         # 16 byte alignment
-        if final_depth%2==0:
-            final_depth+=1 
+        # if final_depth%2==0:
+        #     final_depth+=1 
 
         return final_depth
                 
