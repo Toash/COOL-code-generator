@@ -435,7 +435,10 @@ class CoolAsmGen:
                 self.append_asm(ASM_Push(self_reg))
                 # going to put result in ra register.
                 # constructor has no arguments and no self object.
-                self.append_asm(ASM_Call_Label(f"{Type}..new"))
+                if(Type == "SELF_TYPE"):
+                    self.append_asm(ASM_Call_Label(f"{self.current_class}..new"))
+                else:
+                    self.append_asm(ASM_Call_Label(f"{Type}..new"))
                 self.append_asm(ASM_Pop(self_reg))
                 self.append_asm(ASM_Pop("fp"))
                 # New object now in accumulator.
