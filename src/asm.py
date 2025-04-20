@@ -1001,6 +1001,8 @@ class CoolAsmGen:
         """Recursively try to evaluate expr as a constant integer."""
         if isinstance(expr, Integer):
             return int(expr.Integer)
+        elif isinstance(expr, Identifier):
+            pass
         elif isinstance(expr, Negate):
             val = self.eval_constant_expr(expr.Exp[1])
             return -val if val is not None else None
