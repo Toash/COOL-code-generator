@@ -297,7 +297,6 @@ class X86Gen:
 
     #cool_asm to x86 register
     def get_reg(self,reg):
-        # TODO: register spillover ( more than 6 arguments)
         return {
            "r0":"%r12",
             "r1":"%r13",

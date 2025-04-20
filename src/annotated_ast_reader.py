@@ -220,20 +220,3 @@ class AnnotatedAstReader:
             parent = self.read()
             self.parent_map[child] = parent
 
-    # get non inherited methods
-    def get_direct_methods(self):
-        self.direct_methods = {}
-        for class_name in self.class_map:
-            for (cls, method), imp in self.imp_map.items():
-                if cls != class_name:
-                    continue
-
-                parent = self.parent_map.get(class_name)
-                inherited=False
-                while parent:
-                    if (parent,method) in self.imp_map:
-                        inherited = True
-                        break
-                    parent = self.parent_map.get(parent)
-                if not inherited:
-                    self.direct_methods[(cls,method)] = imp
