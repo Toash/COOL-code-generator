@@ -60,8 +60,6 @@ class CoolAsmGen:
         self.emit_constructors()
         self.emit_methods()
 
-
-        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
         
         for line in set(self.dispatch_lines):
             emit_dispatch_on_void(self.asm_instructions,line)
@@ -71,33 +69,34 @@ class CoolAsmGen:
         for line in set(self.div_zero_lines):
             emit_divide_by_zero(self.asm_instructions,line)
 
+        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
+        if not self.x86:
+
+            emit_comparison_handler("eq", self.asm_instructions,x86)
+            emit_comparison_false("eq", self.asm_instructions,x86)
+            emit_comparison_true("eq", self.asm_instructions,x86)
+            emit_comparison_bool("eq", self.asm_instructions,x86)
+            emit_comparison_int("eq", self.asm_instructions,x86)
+            emit_comparison_string("eq", self.asm_instructions,x86)
+            emit_comparison_end("eq", self.asm_instructions,x86)
+
+            emit_comparison_handler("le", self.asm_instructions,x86)
+            emit_comparison_false("le", self.asm_instructions,x86)
+            emit_comparison_true("le", self.asm_instructions,x86)
+            emit_comparison_bool("le", self.asm_instructions,x86)
+            emit_comparison_int("le", self.asm_instructions,x86)
+            emit_comparison_string("le", self.asm_instructions,x86)
+            emit_comparison_end("le", self.asm_instructions,x86)
+
+            emit_comparison_handler("lt", self.asm_instructions,x86)
+            emit_comparison_false("lt", self.asm_instructions,x86)
+            emit_comparison_true("lt", self.asm_instructions,x86)
+            emit_comparison_bool("lt", self.asm_instructions,x86)
+            emit_comparison_int("lt", self.asm_instructions,x86)
+            emit_comparison_string("lt", self.asm_instructions,x86)
+            emit_comparison_end("lt", self.asm_instructions,x86)
         
-        emit_comparison_handler("eq", self.asm_instructions,x86)
-        emit_comparison_false("eq", self.asm_instructions,x86)
-        emit_comparison_true("eq", self.asm_instructions,x86)
-        emit_comparison_bool("eq", self.asm_instructions,x86)
-        emit_comparison_int("eq", self.asm_instructions,x86)
-        emit_comparison_string("eq", self.asm_instructions,x86)
-        emit_comparison_end("eq", self.asm_instructions,x86)
-
-        emit_comparison_handler("le", self.asm_instructions,x86)
-        emit_comparison_false("le", self.asm_instructions,x86)
-        emit_comparison_true("le", self.asm_instructions,x86)
-        emit_comparison_bool("le", self.asm_instructions,x86)
-        emit_comparison_int("le", self.asm_instructions,x86)
-        emit_comparison_string("le", self.asm_instructions,x86)
-        emit_comparison_end("le", self.asm_instructions,x86)
-
-        emit_comparison_handler("lt", self.asm_instructions,x86)
-        emit_comparison_false("lt", self.asm_instructions,x86)
-        emit_comparison_true("lt", self.asm_instructions,x86)
-        emit_comparison_bool("lt", self.asm_instructions,x86)
-        emit_comparison_int("lt", self.asm_instructions,x86)
-        emit_comparison_string("lt", self.asm_instructions,x86)
-        emit_comparison_end("lt", self.asm_instructions,x86)
-
-
-        self.emit_start()
+            self.emit_start()
 
 
     def emit_vtables(self) -> None:

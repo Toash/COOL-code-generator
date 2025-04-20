@@ -1,0 +1,697 @@
+
+                        ## ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.globl eq_handler
+eq_handler:             ## helper function for =
+                        pushq %rbp
+                        movq %rsp, %rbp
+                        movq 32(%rbp), %r12
+                        ## return address handling
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        cmpq %r14, %r13
+			je eq_true
+                        movq $0, %r15
+                        cmpq %r15, %r13
+			je eq_false
+                        cmpq %r15, %r14
+			je eq_false
+                        movq 0(%r13), %r13
+                        movq 0(%r14), %r14
+                        ## place the sum of the type tags in r1
+                        addq %r14, %r13
+                        movq $0, %r14
+                        cmpq %r14, %r13
+			je eq_bool
+                        movq $2, %r14
+                        cmpq %r14, %r13
+			je eq_int
+                        movq $6, %r14
+                        cmpq %r14, %r13
+			je eq_string
+                        ## otherwise, use pointer comparison
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        cmpq %r14, %r13
+			je eq_true
+.globl eq_false
+eq_false:               ## not equal
+                        ## new Bool
+                        pushq %rbp
+                        pushq %r12
+                        movq $Bool..new, %r14
+                        call *%r14
+                        popq %r12
+                        popq %rbp
+                        jmp eq_end
+.globl eq_true
+eq_true:                ## equal
+                        ## new Bool
+                        pushq %rbp
+                        pushq %r12
+                        movq $Bool..new, %r14
+                        call *%r14
+                        popq %r12
+                        popq %rbp
+                        movq $1, %r14
+                        movq %r14, 24(%r13)
+                        jmp eq_end
+.globl eq_bool
+eq_bool:                ## two Bools
+.globl eq_int
+eq_int:                 ## two Ints
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq 24(%r13), %r13
+                        movq 24(%r14), %r14
+                        cmpq %r14, %r13
+			je eq_true
+                        jmp eq_false
+.globl eq_string
+eq_string:              ## two Strings
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq 24(%r13), %r13
+                        movq 24(%r14), %r14
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
+			movq %r14, %rsi
+			call strcmp 
+			cmp $0, %eax
+			je eq_true
+                        jmp eq_false
+.globl eq_end
+eq_end:                 ## return address handling
+                        movq %rbp, %rsp
+                        popq %rbp
+                        ret
+                        ## ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.globl le_handler
+le_handler:             ## helper function for <=
+                        pushq %rbp
+                        movq %rsp, %rbp
+                        movq 32(%rbp), %r12
+                        ## return address handling
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        cmpq %r14, %r13
+			je le_true
+                        movq $0, %r15
+                        cmpq %r15, %r13
+			je le_false
+                        cmpq %r15, %r14
+			je le_false
+                        movq 0(%r13), %r13
+                        movq 0(%r14), %r14
+                        ## place the sum of the type tags in r1
+                        addq %r14, %r13
+                        movq $0, %r14
+                        cmpq %r14, %r13
+			je le_bool
+                        movq $2, %r14
+                        cmpq %r14, %r13
+			je le_int
+                        movq $6, %r14
+                        cmpq %r14, %r13
+			je le_string
+                        ## for non-primitives, equality is our only hope
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        cmpq %r14, %r13
+			je le_true
+.globl le_false
+le_false:               ## not less-than-or-equal
+                        ## new Bool
+                        pushq %rbp
+                        pushq %r12
+                        movq $Bool..new, %r14
+                        call *%r14
+                        popq %r12
+                        popq %rbp
+                        jmp le_end
+.globl le_true
+le_true:                ## less-than-or-equal
+                        ## new Bool
+                        pushq %rbp
+                        pushq %r12
+                        movq $Bool..new, %r14
+                        call *%r14
+                        popq %r12
+                        popq %rbp
+                        movq $1, %r14
+                        movq %r14, 24(%r13)
+                        jmp le_end
+.globl le_bool
+le_bool:                ## two Bools
+.globl le_int
+le_int:                 ## two Ints
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq 24(%r13), %r13
+                        movq 24(%r14), %r14
+                        cmpl %r14d, %r13d
+			jle le_true
+                        jmp le_false
+.globl le_string
+le_string:              ## two Strings
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq 24(%r13), %r13
+                        movq 24(%r14), %r14
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
+			movq %r14, %rsi
+			call strcmp 
+			cmp $0, %eax
+			jle le_true
+                        jmp le_false
+.globl le_end
+le_end:                 ## return address handling
+                        movq %rbp, %rsp
+                        popq %rbp
+                        ret
+                        ## ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.globl lt_handler
+lt_handler:             ## helper function for <
+                        pushq %rbp
+                        movq %rsp, %rbp
+                        movq 32(%rbp), %r12
+                        ## return address handling
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq $0, %r15
+                        cmpq %r15, %r13
+			je lt_false
+                        cmpq %r15, %r14
+			je lt_false
+                        movq 0(%r13), %r13
+                        movq 0(%r14), %r14
+                        ## place the sum of the type tags in r1
+                        addq %r14, %r13
+                        movq $0, %r14
+                        cmpq %r14, %r13
+			je lt_bool
+                        movq $2, %r14
+                        cmpq %r14, %r13
+			je lt_int
+                        movq $6, %r14
+                        cmpq %r14, %r13
+			je lt_string
+                        ## for non-primitives, < is always false
+.globl lt_false
+lt_false:               ## not less than
+                        ## new Bool
+                        pushq %rbp
+                        pushq %r12
+                        movq $Bool..new, %r14
+                        call *%r14
+                        popq %r12
+                        popq %rbp
+                        jmp lt_end
+.globl lt_true
+lt_true:                ## less than
+                        ## new Bool
+                        pushq %rbp
+                        pushq %r12
+                        movq $Bool..new, %r14
+                        call *%r14
+                        popq %r12
+                        popq %rbp
+                        movq $1, %r14
+                        movq %r14, 24(%r13)
+                        jmp lt_end
+.globl lt_bool
+lt_bool:                ## two Bools
+.globl lt_int
+lt_int:                 ## two Ints
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq 24(%r13), %r13
+                        movq 24(%r14), %r14
+                        cmpl %r14d, %r13d
+			jl lt_true
+                        jmp lt_false
+.globl lt_string
+lt_string:              ## two Strings
+                        movq 32(%rbp), %r13
+                        movq 24(%rbp), %r14
+                        movq 24(%r13), %r13
+                        movq 24(%r14), %r14
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movq %r13, %rdi
+			movq %r14, %rsi
+			call strcmp 
+			cmp $0, %eax
+			jl lt_true
+                        jmp lt_false
+.globl lt_end
+lt_end:                 ## return address handling
+                        movq %rbp, %rsp
+                        popq %rbp
+                        ret
+                        ## ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+.globl start
+start:                  ## program begins here
+                        .globl main
+			.type main, @function
+main:
+                        movq $Main..new, %r14
+                        pushq %rbp
+                        call *%r14
+                        pushq %rbp
+                        pushq %r13
+                        movq $Main.main, %r14
+                        call *%r14
+                        ## guarantee 16-byte alignment before call
+			andq $0xFFFFFFFFFFFFFFF0, %rsp
+			movl $0, %edi
+			call exit
+                        
+	.globl	cooloutstr
+	.type	cooloutstr, @function
+cooloutstr:
+.LFB6:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	subq	$32, %rsp
+	movq	%rdi, -24(%rbp)
+	movl	$0, -4(%rbp)
+	jmp	.L2
+.L5:
+	movl	-4(%rbp), %eax
+	movslq	%eax, %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	cmpb	$92, %al
+	jne	.L3
+	movl	-4(%rbp), %eax
+	cltq
+	leaq	1(%rax), %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	cmpb	$110, %al
+	jne	.L3
+	movq	stdout(%rip), %rax
+	movq	%rax, %rsi
+	movl	$10, %edi
+	call	fputc@PLT
+	addl	$2, -4(%rbp)
+	jmp	.L2
+.L3:
+	movl	-4(%rbp), %eax
+	movslq	%eax, %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	cmpb	$92, %al
+	jne	.L4
+	movl	-4(%rbp), %eax
+	cltq
+	leaq	1(%rax), %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	cmpb	$116, %al
+	jne	.L4
+	movq	stdout(%rip), %rax
+	movq	%rax, %rsi
+	movl	$9, %edi
+	call	fputc@PLT
+	addl	$2, -4(%rbp)
+	jmp	.L2
+.L4:
+	movq	stdout(%rip), %rdx
+	movl	-4(%rbp), %eax
+	movslq	%eax, %rcx
+	movq	-24(%rbp), %rax
+	addq	%rcx, %rax
+	movzbl	(%rax), %eax
+	movsbl	%al, %eax
+	movq	%rdx, %rsi
+	movl	%eax, %edi
+	call	fputc@PLT
+	addl	$1, -4(%rbp)
+.L2:
+	movl	-4(%rbp), %eax
+	movslq	%eax, %rdx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	testb	%al, %al
+	jne	.L5
+	movq	stdout(%rip), %rax
+	movq	%rax, %rdi
+	call	fflush@PLT
+	nop
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE6:
+	.size	cooloutstr, .-cooloutstr
+	.globl	coolstrlen
+	.type	coolstrlen, @function
+coolstrlen:
+.LFB7:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	movq	%rdi, -24(%rbp)
+	movl	$0, -4(%rbp)
+	jmp	.L7
+.L8:
+	movl	-4(%rbp), %eax
+	addl	$1, %eax
+	movl	%eax, -4(%rbp)
+.L7:
+	movl	-4(%rbp), %eax
+	movl	%eax, %edx
+	movq	-24(%rbp), %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	testb	%al, %al
+	jne	.L8
+	movl	-4(%rbp), %eax
+	popq	%rbp
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE7:
+	.size	coolstrlen, .-coolstrlen
+	.section	.rodata
+.LC0:
+	.string	"%s%s"
+	.text
+	.globl	coolstrcat
+	.type	coolstrcat, @function
+coolstrcat:
+.LFB8:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	pushq	%rbx
+	subq	$40, %rsp
+	.cfi_offset 3, -24
+	movq	%rdi, -40(%rbp)
+	movq	%rsi, -48(%rbp)
+	cmpq	$0, -40(%rbp)
+	jne	.L11
+	movq	-48(%rbp), %rax
+	jmp	.L12
+.L11:
+	cmpq	$0, -48(%rbp)
+	jne	.L13
+	movq	-40(%rbp), %rax
+	jmp	.L12
+.L13:
+	movq	-40(%rbp), %rax
+	movq	%rax, %rdi
+	call	coolstrlen
+	movl	%eax, %ebx
+	movq	-48(%rbp), %rax
+	movq	%rax, %rdi
+	call	coolstrlen
+	addl	%ebx, %eax
+	addl	$1, %eax
+	movl	%eax, -28(%rbp)
+	movl	-28(%rbp), %eax
+	cltq
+	movl	$1, %esi
+	movq	%rax, %rdi
+	call	calloc@PLT
+	movq	%rax, -24(%rbp)
+	movl	-28(%rbp), %eax
+	movslq	%eax, %rsi
+	movq	-48(%rbp), %rcx
+	movq	-40(%rbp), %rdx
+	movq	-24(%rbp), %rax
+	movq	%rcx, %r8
+	movq	%rdx, %rcx
+	leaq	.LC0(%rip), %rdx
+	movq	%rax, %rdi
+	movl	$0, %eax
+	call	snprintf@PLT
+	movq	-24(%rbp), %rax
+.L12:
+	movq	-8(%rbp), %rbx
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE8:
+	.size	coolstrcat, .-coolstrcat
+	.globl	coolgetstr
+	.type	coolgetstr, @function
+coolgetstr:
+.LFB9:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	subq	$32, %rsp
+	movq	%fs:40, %rax
+	movq	%rax, -8(%rbp)
+	xorl	%eax, %eax
+	movq	$0, -32(%rbp)
+	movq	$0, -24(%rbp)
+	movq	stdin(%rip), %rdx
+	leaq	-24(%rbp), %rcx
+	leaq	-32(%rbp), %rax
+	movq	%rcx, %rsi
+	movq	%rax, %rdi
+	call	getline@PLT
+	movq	%rax, -16(%rbp)
+	cmpq	$-1, -16(%rbp)
+	je	.L15
+	movq	-32(%rbp), %rax
+	testq	%rax, %rax
+	jne	.L16
+.L15:
+	movq	-32(%rbp), %rax
+	movq	%rax, %rdi
+	call	free@PLT
+	movl	$1, %edi
+	call	malloc@PLT
+	movq	%rax, -32(%rbp)
+	movq	-32(%rbp), %rax
+	movb	$0, (%rax)
+	jmp	.L17
+.L16:
+	movq	-16(%rbp), %rdx
+	movq	-32(%rbp), %rax
+	movl	$0, %esi
+	movq	%rax, %rdi
+	call	memchr@PLT
+	testq	%rax, %rax
+	je	.L18
+	movq	-32(%rbp), %rax
+	movb	$0, (%rax)
+	jmp	.L17
+.L18:
+	movq	-32(%rbp), %rdx
+	movq	-16(%rbp), %rax
+	subq	$1, %rax
+	addq	%rdx, %rax
+	movzbl	(%rax), %eax
+	cmpb	$10, %al
+	jne	.L17
+	movq	-32(%rbp), %rdx
+	subq	$1, -16(%rbp)
+	movq	-16(%rbp), %rax
+	addq	%rdx, %rax
+	movb	$0, (%rax)
+.L17:
+	movq	-32(%rbp), %rax
+	movq	-8(%rbp), %rdx
+	subq	%fs:40, %rdx
+	je	.L20
+	call	__stack_chk_fail@PLT
+.L20:
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE9:
+	.size	coolgetstr, .-coolgetstr
+	.globl	coolsubstr
+	.type	coolsubstr, @function
+coolsubstr:
+.LFB10:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	subq	$48, %rsp
+	movq	%rdi, -24(%rbp)
+	movq	%rsi, -32(%rbp)
+	movq	%rdx, -40(%rbp)
+	movq	-24(%rbp), %rax
+	movq	%rax, %rdi
+	call	coolstrlen
+	movl	%eax, -4(%rbp)
+	cmpq	$0, -32(%rbp)
+	js	.L22
+	cmpq	$0, -40(%rbp)
+	js	.L22
+	movq	-32(%rbp), %rdx
+	movq	-40(%rbp), %rax
+	addq	%rax, %rdx
+	movl	-4(%rbp), %eax
+	cltq
+	cmpq	%rax, %rdx
+	jle	.L23
+.L22:
+	movl	$0, %eax
+	jmp	.L24
+.L23:
+	movq	-40(%rbp), %rax
+	movq	-32(%rbp), %rcx
+	movq	-24(%rbp), %rdx
+	addq	%rcx, %rdx
+	movq	%rax, %rsi
+	movq	%rdx, %rdi
+	call	strndup@PLT
+.L24:
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE10:
+	.size	coolsubstr, .-coolsubstr
+	.globl	coolinint
+	.type	coolinint, @function
+coolinint:
+.LFB11:
+	.cfi_startproc
+	endbr64
+	pushq	%rbp
+	.cfi_def_cfa_offset 16
+	.cfi_offset 6, -16
+	movq	%rsp, %rbp
+	.cfi_def_cfa_register 6
+	subq	$304, %rsp
+	movq	%fs:40, %rax
+	movq	%rax, -8(%rbp)
+	xorl	%eax, %eax
+	movq	stdin(%rip), %rdx
+	leaq	-272(%rbp), %rax
+	movl	$256, %esi
+	movq	%rax, %rdi
+	call	fgets@PLT
+	testq	%rax, %rax
+	jne	.L26
+	movl	$0, %eax
+	jmp	.L37
+.L26:
+	leaq	-272(%rbp), %rax
+	movq	%rax, -288(%rbp)
+	jmp	.L28
+.L29:
+	addq	$1, -288(%rbp)
+.L28:
+	call	__ctype_b_loc@PLT
+	movq	(%rax), %rdx
+	movq	-288(%rbp), %rax
+	movzbl	(%rax), %eax
+	movzbl	%al, %eax
+	addq	%rax, %rax
+	addq	%rdx, %rax
+	movzwl	(%rax), %eax
+	movzwl	%ax, %eax
+	andl	$8192, %eax
+	testl	%eax, %eax
+	jne	.L29
+	movq	-288(%rbp), %rax
+	movzbl	(%rax), %eax
+	testb	%al, %al
+	je	.L30
+	movq	-288(%rbp), %rax
+	movzbl	(%rax), %eax
+	cmpb	$45, %al
+	je	.L31
+	movq	-288(%rbp), %rax
+	movzbl	(%rax), %eax
+	cmpb	$43, %al
+	je	.L31
+	call	__ctype_b_loc@PLT
+	movq	(%rax), %rdx
+	movq	-288(%rbp), %rax
+	movzbl	(%rax), %eax
+	movzbl	%al, %eax
+	addq	%rax, %rax
+	addq	%rdx, %rax
+	movzwl	(%rax), %eax
+	movzwl	%ax, %eax
+	andl	$2048, %eax
+	testl	%eax, %eax
+	jne	.L31
+.L30:
+	movl	$0, %eax
+	jmp	.L37
+.L31:
+	leaq	-296(%rbp), %rcx
+	movq	-288(%rbp), %rax
+	movl	$10, %edx
+	movq	%rcx, %rsi
+	movq	%rax, %rdi
+	call	strtol@PLT
+	movq	%rax, -280(%rbp)
+	movabsq	$-2147483649, %rax
+	cmpq	%rax, -280(%rbp)
+	jle	.L32
+	movl	$2147483648, %eax
+	cmpq	%rax, -280(%rbp)
+	jl	.L34
+.L32:
+	movl	$0, %eax
+	jmp	.L37
+.L36:
+	movq	-296(%rbp), %rax
+	addq	$1, %rax
+	movq	%rax, -296(%rbp)
+.L34:
+	movq	-296(%rbp), %rax
+	movzbl	(%rax), %eax
+	testb	%al, %al
+	je	.L35
+	movq	-296(%rbp), %rax
+	movzbl	(%rax), %eax
+	cmpb	$10, %al
+	jne	.L36
+.L35:
+	movq	-280(%rbp), %rax
+.L37:
+	movq	-8(%rbp), %rdx
+	subq	%fs:40, %rdx
+	je	.L38
+	call	__stack_chk_fail@PLT
+.L38:
+	leave
+	.cfi_def_cfa 7, 8
+	ret
+	.cfi_endproc
+.LFE11:
+	.size	coolinint, .-coolinint

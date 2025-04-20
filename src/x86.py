@@ -3,6 +3,7 @@ from asm import CoolAsmGen
 from asm_instructions import *
 from x86_strings import *
 from x86_ints import *
+from x86_built_in import *
 
 
 # given cl-type, parses cl-type, converts to cool-asm, then to x86.
@@ -26,49 +27,52 @@ class X86Gen:
             c_placeholders(self.outfile)
 
             # out_string
-            emit_cooloutstr_start(self.outfile)
-            emit_cooloutstr_loop_start(self.outfile)
-            emit_cooloutstr_check_newline(self.outfile)
-            emit_cooloutstr_check_tab(self.outfile)
-            emit_cooloutstr_print(self.outfile)
+            # emit_cooloutstr_start(self.outfile)
+            # emit_cooloutstr_loop_start(self.outfile)
+            # emit_cooloutstr_check_newline(self.outfile)
+            # emit_cooloutstr_check_tab(self.outfile)
+            # emit_cooloutstr_print(self.outfile)
 
-            emit_coolstrlen_start(self.outfile)
-            emit_coolstrlen_test(self.outfile)
-            emit_coolstrlen_increment(self.outfile)
+            # emit_coolstrlen_start(self.outfile)
+            # emit_coolstrlen_test(self.outfile)
+            # emit_coolstrlen_increment(self.outfile)
 
-            emit_cat_placeholders(self.outfile)
+            # emit_cat_placeholders(self.outfile)
 
-            emit_coolstrcat_start(self.outfile)
-            emit_coolstrcat_check_second(self.outfile)
-            emit_coolstrcat_concat(self.outfile)
-            emit_coolstrcat_return(self.outfile)
+            # emit_coolstrcat_start(self.outfile)
+            # emit_coolstrcat_check_second(self.outfile)
+            # emit_coolstrcat_concat(self.outfile)
+            # emit_coolstrcat_return(self.outfile)
 
-            emit_coolsubstr_start(self.outfile)
-            emit_coolsubstr_null(self.outfile)
-            emit_coolsubstr_substr(self.outfile)
-            emit_coolsubstr_end(self.outfile)
+            # emit_coolsubstr_start(self.outfile)
+            # emit_coolsubstr_null(self.outfile)
+            # emit_coolsubstr_substr(self.outfile)
+            # emit_coolsubstr_end(self.outfile)
 
-            emit_empty_string(self.outfile)
-            emit_coolgetstr_start(self.outfile)
-            emit_coolgetstr_loop_start(self.outfile)
-            emit_coolgetstr_end_condition(self.outfile)
-            emit_coolgetstr_return_buffer(self.outfile)
-            emit_coolgetstr_check_null_char(self.outfile)
-            emit_coolgetstr_store_char(self.outfile)
-            emit_coolgetstr_return(self.outfile)
+            # emit_empty_string(self.outfile)
+            # emit_coolgetstr_start(self.outfile)
+            # emit_coolgetstr_loop_start(self.outfile)
+            # emit_coolgetstr_end_condition(self.outfile)
+            # emit_coolgetstr_return_buffer(self.outfile)
+            # emit_coolgetstr_check_null_char(self.outfile)
+            # emit_coolgetstr_store_char(self.outfile)
+            # emit_coolgetstr_return(self.outfile)
 
-            emit_coolinint(self.outfile)
-            emit_coolinint_read_success(self.outfile)
-            emit_coolinint_advance_pointer(self.outfile)
-            emit_coolinint_skip_whitespace(self.outfile)
-            emit_coolinint_null(self.outfile)
-            emit_coolinint_parse_int(self.outfile)
-            emit_coolinint_int_out_of_range(self.outfile)
-            emit_coolinint_newline_continue(self.outfile)
-            emit_coolinint_skip_newline_check(self.outfile)
-            emit_coolinint_return_result(self.outfile)
-            emit_coolinint_function_exit(self.outfile)
-            emit_coolinint_check_canary_passed(self.outfile)
+            # emit_coolinint(self.outfile)
+            # emit_coolinint_read_success(self.outfile)
+            # emit_coolinint_advance_pointer(self.outfile)
+            # emit_coolinint_skip_whitespace(self.outfile)
+            # emit_coolinint_null(self.outfile)
+            # emit_coolinint_parse_int(self.outfile)
+            # emit_coolinint_int_out_of_range(self.outfile)
+            # emit_coolinint_newline_continue(self.outfile)
+            # emit_coolinint_skip_newline_check(self.outfile)
+            # emit_coolinint_return_result(self.outfile)
+            # emit_coolinint_function_exit(self.outfile)
+            # emit_coolinint_check_canary_passed(self.outfile)
+
+            # instead emitting them directly from reference compiler :)
+            emit_built_in(self.outfile)
 
             # mark stack as non executabale
             self.outfile.write(".section .note.GNU-stack,\"\",@progbits\n")
