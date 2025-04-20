@@ -190,30 +190,31 @@ class CoolAsmGen:
 
             # Attributes
             for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
-                if not attr.Initializer: 
-                    if attr.Type == "Unboxed_Int":
-                        self.comment(f"Store raw int {0} for attribute in {cls}.")
-                        self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
-                    elif attr.Type == "Unboxed_String":
-                        self.comment(f"Store raw string for attribute in String.")
-                        self.append_asm(ASM_La(acc_reg,"the.empty.string"))
-                    else:
-                        if attr.Type == "Int" or attr.Type == "String" or attr.Type == "Bool":
-                            self.cgen(New(Type=attr.Type, StaticType=attr.Type))
-                        else:
-                            self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
-
-                    self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
-                    self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
-                elif attr.Initializer:   
+                # print(f"({actual_attr_index}) {cls}: {attr}")
+                if attr.Type == "Unboxed_Int":
+                    self.comment(f"Store raw int {0} for attribute in {cls}.")
+                    self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
+                elif attr.Type == "Unboxed_String":
+                    self.comment(f"Store raw string for attribute in String.")
+                    self.append_asm(ASM_La(acc_reg,"the.empty.string"))
+                else:
                     if attr.Type == "Int" or attr.Type == "String" or attr.Type == "Bool":
                         self.cgen(New(Type=attr.Type, StaticType=attr.Type))
-                    self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
-                    self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
+                    else:
+                        # "void"
+                        self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
+
+                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
+                self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
+
+            # initialize attributes
+            for actual_attr_index,attr in enumerate(attrs, start=attributes_start_index):
+                if attr.Initializer:   
 
                     exp = attr.Initializer[1]
                     self.cgen(exp)
                     self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
+                    self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
 
                 # Attribute in acc
 
