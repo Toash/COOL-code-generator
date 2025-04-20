@@ -1,6 +1,16 @@
 #!/bin/bash
 
 TESTS=(
+  # "cool_arith" #takes  input
+  "cool_atoi"
+  "cool_cells"
+  "cool_hs" #hairy scary indeed
+  "cool_list"
+  "cool_new-complex"
+  "cool_primes"
+  "cool_print-cool"
+  # "cool_sort-list"
+  "cool_list" 
   "book_list"
   "staircase"
   "more_arith"
@@ -45,15 +55,6 @@ TESTS=(
   "case2"
   "case3"
   "isvoid"
-  # "cool_arith" takes  input
-  "cool_atoi"
-  "cool_cells"
-  # "cool_hs" hairy scary indeed
-  "cool_list"
-  "cool_new-complex"
-  "cool_primes"
-  "cool_print-cool"
-  # "cool_sort-list" this requires input
 )
 
 GREEN='\033[0;32m'
