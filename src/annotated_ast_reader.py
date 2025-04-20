@@ -211,6 +211,15 @@ class AnnotatedAstReader:
         body = self.read_exp()
         self.imp_map[(class_name, method_name)].append(body)
 
+
+    def read_parent_map(self):
+        self.read()
+        num_relations = self.read()
+        for i in range(int(num_relations)):
+            child = self.read()
+            parent = self.read()
+            self.parent_map[child] = parent
+
     # get non inherited methods
     def get_direct_methods(self):
         self.direct_methods = {}
@@ -228,12 +237,3 @@ class AnnotatedAstReader:
                     parent = self.parent_map.get(parent)
                 if not inherited:
                     self.direct_methods[(cls,method)] = imp
-
-    def read_parent_map(self):
-        self.read()
-        num_relations = self.read()
-        for i in range(int(num_relations)):
-            child = self.read()
-            parent = self.read()
-            self.parent_map[child] = parent
-

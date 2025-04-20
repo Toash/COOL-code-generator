@@ -794,13 +794,14 @@ class CoolAsmGen:
                 # by added i mean, checking and branching if equal.
                 for class_name in self.class_map:
                     if class_name not in temp_class_name_to_label:
-                        parent_name = self.parent_map.get(class_name)
-                        if parent_name in temp_class_name_to_label:
-                            # parent is something we already added, but we didnt add the subtype yet. we should add it. 
-                            child_type_tag= self.class_to_tag.get(class_name) 
-                            self.append_asm(ASM_Li(temp_reg,ASM_Value(child_type_tag)))
-                            case_exp_label = temp_class_name_to_label[parent_name]
-                            self.append_asm(ASM_Beq(acc_reg,temp_reg,case_exp_label))
+                        parent_names = self.get_parents(class_name)
+                        for parent_name in parent_names:
+                            if parent_name in temp_class_name_to_label:
+                                # parent is something we already added, but we didnt add the subtype yet. we should add it. 
+                                child_type_tag= self.class_to_tag.get(class_name) 
+                                self.append_asm(ASM_Li(temp_reg,ASM_Value(child_type_tag)))
+                                case_exp_label = temp_class_name_to_label[parent_name]
+                                self.append_asm(ASM_Beq(acc_reg,temp_reg,case_exp_label))
 
                 no_branch= f"case_without_branch_{line_number}_{exp_type}" 
 
@@ -1285,6 +1286,15 @@ class CoolAsmGen:
         return f"branch_{self.branch_counter}"
         # return (str(uuid.uuid4()).replace("-",""))
 
+    def get_parents(self,child):
+        parents = set(["Object"])
+        
+        while child != "Object":
+            parent = self.parent_map[child]
+            parents.add(parent)
+            child = parent
+
+        return parents
 
 if __name__ == "__main__":
     file = sys.argv[1]
