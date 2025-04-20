@@ -60,8 +60,9 @@ class CoolAsmGen:
         self.emit_constructors()
         self.emit_methods()
 
-        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
 
+        emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
+        
         for line in set(self.dispatch_lines):
             emit_dispatch_on_void(self.asm_instructions,line)
         for line,exp in set(self.case_lines_and_exps):
@@ -70,6 +71,7 @@ class CoolAsmGen:
         for line in set(self.div_zero_lines):
             emit_divide_by_zero(self.asm_instructions,line)
 
+        
         emit_comparison_handler("eq", self.asm_instructions,x86)
         emit_comparison_false("eq", self.asm_instructions,x86)
         emit_comparison_true("eq", self.asm_instructions,x86)
@@ -1287,11 +1289,11 @@ class CoolAsmGen:
         # return (str(uuid.uuid4()).replace("-",""))
 
     def get_parents(self,child):
-        parents = set(["Object"])
+        parents = []
         
         while child != "Object":
             parent = self.parent_map[child]
-            parents.add(parent)
+            parents.append(parent)
             child = parent
 
         return parents
