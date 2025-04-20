@@ -9,7 +9,6 @@ class AnnotatedAstReader:
         self.class_map = {}
         self.imp_map = {}
         self.parent_map = {}
-        self.direct_methods = {}
 
         self.read_lines()
 
@@ -18,8 +17,7 @@ class AnnotatedAstReader:
         self.read_imp_map()
         self.read_parent_map()
 
-        self.get_direct_methods()
-        return self.class_map, self.imp_map, self.parent_map, self.direct_methods
+        return self.class_map, self.imp_map, self.parent_map 
     
     def read_lines(self):
         sys.setrecursionlimit(20000)

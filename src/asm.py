@@ -17,7 +17,7 @@ from pprint import pprint
 class CoolAsmGen:
     def __init__(self, file, x86=False):
         parser = AnnotatedAstReader(file)
-        self.class_map, self.imp_map, self.parent_map,self.direct_methods = parser.parse()
+        self.class_map, self.imp_map, self.parent_map = parser.parse()
 
         self.x86=x86
         self.asm_instructions = [] # cool assembly emitted here.
