@@ -555,10 +555,7 @@ class CoolAsmGen:
                 self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
 
-                const_denom_val = self.eval_constant_expr(Right[1])
-                denom_is_zero = const_denom_val == 0
-                if denom_is_zero:
-                    self.div_zero_lines.append(denominator_line_number)
+                self.div_zero_lines.append(denominator_line_number)
 
 
                 self.cgen(Right[1])
@@ -566,16 +563,15 @@ class CoolAsmGen:
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
-                if denom_is_zero:
-                    # check for zero, if not , jump to true branch.
-                    div_ok_label = "div_ok_" + self.get_branch_label()
-                    self.append_asm(ASM_Bnz(acc_reg,div_ok_label))
-                    # denominnator is zero
-                    self.append_asm(ASM_La(acc_reg, "divide_by_zero_string_"+denominator_line_number))
-                    self.append_asm(ASM_Syscall("IO.out_string"))
-                    self.append_asm(ASM_Syscall("exit"))
+                # check for zero, if not , jump to true branch.
+                div_ok_label = "div_ok_" + self.get_branch_label()
+                self.append_asm(ASM_Bnz(acc_reg,div_ok_label))
+                # denominnator is zero
+                self.append_asm(ASM_La(acc_reg, "divide_by_zero_string_"+denominator_line_number))
+                self.append_asm(ASM_Syscall("IO.out_string"))
+                self.append_asm(ASM_Syscall("exit"))
 
-                    self.append_asm(ASM_Label(div_ok_label))
+                self.append_asm(ASM_Label(div_ok_label))
 
                 self.append_asm(ASM_Div(acc_reg,temp_reg))
 
@@ -995,38 +991,6 @@ class CoolAsmGen:
 
 
         self.comment(f"cgen-: {type(exp).__name__}")
-
-    def eval_constant_expr(self,expr):
-        # print(expr)
-        """Recursively try to evaluate expr as a constant integer."""
-        if isinstance(expr, Integer):
-            return int(expr.Integer)
-        elif isinstance(expr, Identifier):
-            pass
-        elif isinstance(expr, Negate):
-            val = self.eval_constant_expr(expr.Exp[1])
-            return -val if val is not None else None
-        elif isinstance(expr, Plus):
-            left = self.eval_constant_expr(expr.Left[1])
-            right = self.eval_constant_expr(expr.Right[1])
-            return left + right if None not in (left, right) else None
-        elif isinstance(expr, Minus):
-            left = self.eval_constant_expr(expr.Left[1])
-            right = self.eval_constant_expr(expr.Right[1])
-            return left - right if None not in (left, right) else None
-        elif isinstance(expr, Times):
-            left = self.eval_constant_expr(expr.Left[1])
-            right = self.eval_constant_expr(expr.Right[1])
-            return left * right if None not in (left, right) else None
-        elif isinstance(expr, Divide):
-            left = self.eval_constant_expr(expr.Left[1])
-            right = self.eval_constant_expr(expr.Right[1])
-            if None not in (left, right) and right != 0:
-                return left // right
-            else:
-                return None
-        print("Unknown arithmetic expression: ", expr)
-        return None  
 
     def gen_dispatch_helper(self, Exp, Type, Method, Args):
         if Exp:
