@@ -1,8 +1,7 @@
 class Main inherits IO
 {
-  x:Int<-x+1;
   main() : Object
   {
-    out_int(x)
+    420+420
   };
 };

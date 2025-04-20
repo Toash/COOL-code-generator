@@ -203,13 +203,19 @@ class CoolAsmGen:
                         else:
                             self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
 
+                    self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
+                    self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
                 elif attr.Initializer:   
+                    if attr.Type == "Int" or attr.Type == "String" or attr.Type == "Bool":
+                        self.cgen(New(Type=attr.Type, StaticType=attr.Type))
+                    self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
+                    self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
+
                     exp = attr.Initializer[1]
                     self.cgen(exp)
+                    self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
 
                 # Attribute in acc
-                self.append_asm(ASM_St(dest = self_reg,src = acc_reg,offset = actual_attr_index))
-                self.symbol_stack.insert_symbol(attr.Name,Offset(self_reg,actual_attr_index))
 
             self.append_asm(ASM_Mov(acc_reg,self_reg))
 
@@ -350,7 +356,8 @@ class CoolAsmGen:
                 self.cgen(Exp[1])
                 location = self.symbol_stack.lookup_symbol(Var[1])
                 if location is None:
-                    raise Exception(f"{var} could not be found in the  symbol stack!")
+                    print(f"{var} could not be found in the  symbol stack!")
+                    # raise Exception(f"{var} could not be found in the  symbol stack!")
 
                 match location: 
                     case Offset(reg,offset):
@@ -360,7 +367,8 @@ class CoolAsmGen:
                         self.comment(f"SYMBOL TABLE: update {var} in register {reg}")
                         self.append_asm(ASM_Mov(reg,acc_reg))
                     case _:
-                        raise Exception(f"Unhandled symbol location: {location}" )
+                        print(f"Unhandled symbol location: {location}" )
+                        # raise Exception(f"Unhandled symbol location: {location}" )
 
             case Dynamic_Dispatch(Exp,Method,Args):
                 self.gen_dispatch_helper(Exp=Exp, Type=None, Method=Method, Args=Args)
@@ -610,7 +618,8 @@ class CoolAsmGen:
                     case "Eq":
                         self.append_asm(ASM_Call_Label("eq_handler"))
                     case _:
-                        raise Exception("Unknown conditional expression:", exp)
+                        print("Unknown conditional expression:", exp)
+                        # raise Exception("Unknown conditional expression:", exp)
 
                 if self.x86:
                     self.append_asm(ASM_Li(temp_reg,ASM_Word(3)))
@@ -687,7 +696,8 @@ class CoolAsmGen:
                         else:
                             self.append_asm(ASM_Ld(dest=acc_reg,src=reg,offset=offset))
                     case _:
-                        raise Exception(f"Could not find identifier {var}!")
+                        print(f"Could not find identifier {var}!")
+                        # raise Exception(f"Could not find identifier {var}!")
 
                 # loaded in acc
 
@@ -980,8 +990,8 @@ class CoolAsmGen:
                         self.append_asm(ASM_Mov(acc_reg,temp2_reg))
 
                     case _:
+                        print("Unhandled internal method: ", Body)
                         # raise Exception("Unhandled internal method: ", Body)
-                        pass
             case _:
                 print("Unknown expression in cgen: ", exp)
                 pass
