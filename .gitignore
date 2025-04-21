@@ -14,6 +14,14 @@ more_tests
 more_tests.sh
 0.cl
 
+my_out
+my_output.txt
+ref_output
+ref_output.txt
+
+asm_notes.txt
+notes.txt
+
 # for reference
 COOL_REFERENCE
 MY_OUTPUT
