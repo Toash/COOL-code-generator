@@ -26,52 +26,7 @@ class X86Gen:
         finally:
             c_placeholders(self.outfile)
 
-            # out_string
-            # emit_cooloutstr_start(self.outfile)
-            # emit_cooloutstr_loop_start(self.outfile)
-            # emit_cooloutstr_check_newline(self.outfile)
-            # emit_cooloutstr_check_tab(self.outfile)
-            # emit_cooloutstr_print(self.outfile)
-
-            # emit_coolstrlen_start(self.outfile)
-            # emit_coolstrlen_test(self.outfile)
-            # emit_coolstrlen_increment(self.outfile)
-
-            # emit_cat_placeholders(self.outfile)
-
-            # emit_coolstrcat_start(self.outfile)
-            # emit_coolstrcat_check_second(self.outfile)
-            # emit_coolstrcat_concat(self.outfile)
-            # emit_coolstrcat_return(self.outfile)
-
-            # emit_coolsubstr_start(self.outfile)
-            # emit_coolsubstr_null(self.outfile)
-            # emit_coolsubstr_substr(self.outfile)
-            # emit_coolsubstr_end(self.outfile)
-
-            # emit_empty_string(self.outfile)
-            # emit_coolgetstr_start(self.outfile)
-            # emit_coolgetstr_loop_start(self.outfile)
-            # emit_coolgetstr_end_condition(self.outfile)
-            # emit_coolgetstr_return_buffer(self.outfile)
-            # emit_coolgetstr_check_null_char(self.outfile)
-            # emit_coolgetstr_store_char(self.outfile)
-            # emit_coolgetstr_return(self.outfile)
-
-            # emit_coolinint(self.outfile)
-            # emit_coolinint_read_success(self.outfile)
-            # emit_coolinint_advance_pointer(self.outfile)
-            # emit_coolinint_skip_whitespace(self.outfile)
-            # emit_coolinint_null(self.outfile)
-            # emit_coolinint_parse_int(self.outfile)
-            # emit_coolinint_int_out_of_range(self.outfile)
-            # emit_coolinint_newline_continue(self.outfile)
-            # emit_coolinint_skip_newline_check(self.outfile)
-            # emit_coolinint_return_result(self.outfile)
-            # emit_coolinint_function_exit(self.outfile)
-            # emit_coolinint_check_canary_passed(self.outfile)
-
-            # instead emitting them directly from reference compiler :)
+            # emit directly from reference compiler :)
             emit_built_in(self.outfile)
 
             # mark stack as non executabale
@@ -113,14 +68,34 @@ class X86Gen:
                 case ASM_Sub(left,right):
                     self.write(f"subq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
                 case ASM_Mul(left,right):
-                    self.write(f"imulq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
-                case ASM_Div(left,right):
+                    # self.write(f"imulq\t {self.get_reg(left)}, {self.get_reg(right)}\n")
+
                     self.write(f"movq\t {self.get_reg(right)}, %rax\n")
-                    self.write(f"movq\t {self.get_reg(left)}, %rbx\n")
-                    # sign extend RAX into RDX:RAX (RDX will be all 1s or 0s)
-                    self.write("cqto\n") 
-                    self.write(f"idivq\t %rbx\n")
+                    self.write(f"imull\t {self.get_reg(left)}d, %eax\n")
+                    self.write(f"shlq $32, %rax\n")
+                    self.write(f"shrq $32, %rax\n")
+                    self.write(f"movl\t %eax, {self.get_reg(right)}d\n")
+
+
+                case ASM_Div(left,right):
+                    self.write(f"movq\t $0, %rdx\n")
+                    self.write(f"movq\t {self.get_reg(right)}, %rax\n")
+                    self.write(f"cdq\n")
+                    self.write(f"idivl\t {self.get_reg(left)}d\n")
                     self.write(f"movq\t %rax, {self.get_reg(right)}\n")
+                    # self.write(f"movq\t {self.get_reg(right)}, %rax\n")
+                    # self.write(f"movq\t {self.get_reg(left)}, %rbx\n")
+                    # # sign extend RAX into RDX:RAX (RDX will be all 1s or 0s)
+                    # self.write("cqto\n") 
+                    # self.write(f"idivq\t %rbx\n")
+                    # self.write(f"movq\t %rax, {self.get_reg(right)}\n")
+
+                    # self.write(f"movq\t $0, %rdx\n")
+                    # self.write(f"movq\t %r14, %rax\n")
+                    # self.write(f"cdq\n")
+                    # self.write(f"idivl\t %r13d\n")
+                    # self.write(f"movq\t %rax, %r13\n")
+                    
 
                 case ASM_Jmp(label):
                     self.write(f"jmp\t {label}\n")
@@ -196,12 +171,11 @@ class X86Gen:
                         case "IO.out_int":
                             self.write("## out_int\n")
                             self.write("movq\t $percent.d, %rdi\n")
-                            
-                            self.write("movl\t %eax, %eax ## truncate higher 32 bits\n")
+                           
+                            # for some reaosn the reference compiler prints 32 bit.
+                            self.write("movl\t %r13d, %eax\n")
                             self.write("cdqe\t## sign extend the 32 bit integer\n")
-                            
-                            # accumulator should hold the value we want to print.
-                            self.write("movq\t %r13, %rsi\n")
+                            self.write("movq\t %rax, %rsi\n")
                             self.write("movl\t $0, %eax\t## required by printf.\n")
 
                             self.align_rsp()

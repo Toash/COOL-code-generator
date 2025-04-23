@@ -890,6 +890,7 @@ class CoolAsmGen:
                         self.append_asm(ASM_Ld(acc_reg, acc_reg, attributes_start_index))
 
                         self.append_asm(ASM_Syscall(Body))
+                        self.append_asm(ASM_Mov(acc_reg,self_reg))
 
                     # creates an Int, gets input from user, stores that in the Int
                     case "IO.in_int":
