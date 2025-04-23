@@ -1,3 +1,18 @@
+Optimizations:
+Constant folding, computing constant expressions during compilation instead of emitting code that does it.
+Right now this is only doing for constants, I could extend it to work with Plus, Minus, Times, Divide, Negate
+and Identifiers. This would presumable require keeping track of the values of identifiers in a similar manner
+as the symbol stack
+
+
+TODO:
+Use stack temporaries instead of pushing temporaries on the stack.
+remove suspicious code from pa3
+Register allocation
+Dead code elimination
+
+
+PA3:
 My compiler just uses cl-asm as an ir. I skipped TAC because it wasn't fully working 
 and I just wanted to start printing 1 to the screen quickly.
 

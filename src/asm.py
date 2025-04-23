@@ -15,7 +15,8 @@ from asm_tags import *
 from pprint import pprint
 
 class CoolAsmGen:
-    def __init__(self, file, x86=False):
+    def __init__(self, file, x86=False,opt=True):
+        self.opt = opt
         parser = AnnotatedAstReader(file)
         self.class_map, self.imp_map, self.parent_map = parser.parse()
 
@@ -472,21 +473,55 @@ class CoolAsmGen:
 
 
             case Plus(Left,Right):
-                self.cgen(Left[1])
-                self.append_asm(ASM_Push(acc_reg))
-                self.cgen(Right[1])
-                self.append_asm(ASM_Pop(temp_reg))
+                # print(Left,Right)
+                if self.opt:
+                    # both are ints, compute and load into temp 
+                    if(isinstance(Left[1],Integer) and isinstance(Right[1],Integer)):
+                        left_val = Left[1].Integer  
+                        right_val = Right[1].Integer  
+                        computed_val = int(left_val) + int(right_val)
 
-                self.append_asm(ASM_Ld(
-                    dest = acc_reg,
-                    src = acc_reg,
-                    offset = attributes_start_index))
-                self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+                        # print(computed_val)
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(computed_val)))
+                        self.append_asm(ASM_Push(temp_reg))
+                        self.cgen(New(Type="Int", StaticType="Int"))
+                        self.append_asm(ASM_Pop(temp_reg))
+                        self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                        return
+
+                    # load left into acc
+                    if(isinstance(Left[1],Integer)):
+                        # avoid creating new integer.
+                        val = Left[1].Integer
+                        self.append_asm(ASM_Li(acc_reg,ASM_Value(val)))
+                    else:
+                        self.cgen(Left[1])
+                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+
+                    # load right into temp 
+                    if(isinstance(Right[1],Integer)):
+                        # avoid creating new integer.
+                        val = Right[1].Integer
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
+                    else:
+                        self.cgen(Right[1])
+                        self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+                else:
+
+                    # actually evaluate.
+                    self.cgen(Left[1])
+                    self.append_asm(ASM_Push(acc_reg))
+                    self.cgen(Right[1])
+                    self.append_asm(ASM_Pop(temp_reg))
+
+                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                    self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+
 
                 self.append_asm(ASM_Add(acc_reg,temp_reg))
 
+                # we will eventually use temporaries instead of this.
                 self.append_asm(ASM_Push(temp_reg))
-
                 self.cgen(New(Type="Int", StaticType="Int"))
                 self.append_asm(ASM_Pop(temp_reg))
 
@@ -992,6 +1027,19 @@ class CoolAsmGen:
 
 
         self.comment(f"cgen-: {type(exp).__name__}")
+
+
+    # compute arithmatic during compilatoin
+    """
+    We might be able to just directly compute arithmetic during compilation,
+    The thing is we would need to handle things besides Integers,
+    Such as Plus, Minus, Times, Divide, Negate
+
+    We would also need to handle Identifiers. Presumably we could make another 
+    stack structure that keeps track of the actual values stored in the identifiers.
+    """
+    # def constant_fold(self,Exp):
+        
 
     def gen_dispatch_helper(self, Exp, Type, Method, Args):
         if Exp:

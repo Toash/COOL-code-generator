@@ -16,9 +16,9 @@ rbp - base pointer
 rsp - stack pointer
 """
 class X86Gen:
-    def __init__(self, cl_type, comments=False):
+    def __init__(self, cl_type, comments=False,opt=False):
         outfile_name = cl_type.replace(".cl-type",".s") 
-        cool_asm_gen = CoolAsmGen(file=cl_type,x86=True)
+        cool_asm_gen = CoolAsmGen(file=cl_type,x86=True,opt=opt)
 
         try:
             self.outfile = open(outfile_name,"w")
@@ -285,10 +285,4 @@ class X86Gen:
 
         
 
-if __name__ == "__main__":
-    if len(sys.argv) > 2:
-        print("comments enabled.")
-        x86_gen = X86Gen(sys.argv[1],comments=True)
-    else:
-        x86_gen = X86Gen(sys.argv[1],comments=False)
 
