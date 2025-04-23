@@ -1,3 +1,11 @@
+Code generation and optimization for CS485 Special Topics: Compilers
+
+This course skips past the lexer and parser, and focuses on the semantic analyzer, codegen, and 
+optimization.
+The semantic analyzer I wrote is incomplete so will probably rewrite it later,
+also I would eventually like to just implement the scanner and parser so that the
+full implementation for cool is complete. 
+
 Optimizations:
 Constant folding, computing constant expressions during compilation instead of emitting code that does it.
 Right now this is only doing for constants, I could extend it to work with Plus, Minus, Times, Divide, Negate
@@ -12,7 +20,7 @@ Register allocation
 Dead code elimination
 
 
-PA3:
+PA3 readme:
 My compiler just uses cl-asm as an ir. I skipped TAC because it wasn't fully working 
 and I just wanted to start printing 1 to the screen quickly.
 
