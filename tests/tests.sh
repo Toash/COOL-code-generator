@@ -64,15 +64,32 @@ NC='\033[0m'
 for test in "${TESTS[@]}"; do
   echo "Running $test..."
 
-  cool --type "./tests/$test.cl"
-  python3 ./src/main.py "./tests/$test.cl-type"
-  gcc -no-pie -static ./tests/$test.s -o my_out
-  ./my_out > my_output.txt
+  # check for input file
+  INPUT_FILE="./$test.input"
+  HAS_INPUT=false
+  if [[ -f "$INPUT_FILE" ]]; then
+    HAS_INPUT=true
+  fi
+
+  cool --type "./$test.cl"
+  python3 ../src/main.py "./$test.cl-type"
+  gcc -no-pie -static ./$test.s -o my_out
+
+  if $HAS_INPUT; then
+    cat "$INPUT_FILE" | ./my_out > my_output.txt
+  else
+    ./my_out > my_output.txt
+  fi
 
   # cool "./tests/$test.cl" > ref_output.txt
-  cool --x86 "./tests/$test.cl" 
-  gcc -no-pie -static ./tests/$test.s -o ref_output 
-  ./ref_output > ref_output.txt
+  cool --x86 "./$test.cl" 
+  gcc -no-pie -static ./$test.s -o ref_output 
+  
+  if $HAS_INPUT; then
+    cat "$INPUT_FILE" | ./ref_output > ref_output.txt
+  else
+    ./ref_output > ref_output.txt
+  fi
 
   if diff -q my_output.txt ref_output.txt > /dev/null; then
     echo -e "${GREEN}[PASS]${NC} $test"
@@ -89,4 +106,4 @@ rm my_out
 rm my_output.txt
 rm ref_output
 rm ref_output.txt
-rm -rf ./src/__pycache__
+rm -rf ../src/__pycache__

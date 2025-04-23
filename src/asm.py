@@ -1223,7 +1223,6 @@ class CoolAsmGen:
     # for example, each let binding needs room on the stack.
     # dont need to reserve room for function args, as they are pushed on the stack prior.
     def compute_max_stack_depth(self, exp) -> int:
-        # return 101;
         final_depth = 0
         match exp:
 
