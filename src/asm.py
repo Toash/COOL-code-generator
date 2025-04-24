@@ -475,47 +475,23 @@ class CoolAsmGen:
             case Plus(Left,Right):
                 # print(Left,Right)
                 if self.opt:
-                    # both are ints, compute and load into temp 
-                    if(isinstance(Left[1],Integer) and isinstance(Right[1],Integer)):
-                        left_val = Left[1].Integer  
-                        right_val = Right[1].Integer  
-                        computed_val = int(left_val) + int(right_val)
-
-                        # print(computed_val)
-                        self.append_asm(ASM_Li(temp_reg,ASM_Value(computed_val)))
+                    val = self.eval_constant_expr(exp)
+                    if val is not None:
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
                         self.append_asm(ASM_Push(temp_reg))
-                        self.cgen(New(Type="Int", StaticType="Int"))
+                        self.cgen(New(Type="Int",StaticType="Int"))
                         self.append_asm(ASM_Pop(temp_reg))
-                        self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                        self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
                         return
 
-                    # load left into acc
-                    if(isinstance(Left[1],Integer)):
-                        # avoid creating new integer.
-                        val = Left[1].Integer
-                        self.append_asm(ASM_Li(acc_reg,ASM_Value(val)))
-                    else:
-                        self.cgen(Left[1])
-                        self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                # actually evaluate.
+                self.cgen(Left[1])
+                self.append_asm(ASM_Push(acc_reg))
+                self.cgen(Right[1])
+                self.append_asm(ASM_Pop(temp_reg))
 
-                    # load right into temp 
-                    if(isinstance(Right[1],Integer)):
-                        # avoid creating new integer.
-                        val = Right[1].Integer
-                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
-                    else:
-                        self.cgen(Right[1])
-                        self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
-                else:
-
-                    # actually evaluate.
-                    self.cgen(Left[1])
-                    self.append_asm(ASM_Push(acc_reg))
-                    self.cgen(Right[1])
-                    self.append_asm(ASM_Pop(temp_reg))
-
-                    self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
-                    self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
+                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
 
                 self.append_asm(ASM_Add(acc_reg,temp_reg))
@@ -533,6 +509,16 @@ class CoolAsmGen:
                 # Addition result now in accumulator.
 
             case Minus(Left,Right):
+                if self.opt:
+                    val = self.eval_constant_expr(exp)
+                    if val is not None:
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
+                        self.append_asm(ASM_Push(temp_reg))
+                        self.cgen(New(Type="Int",StaticType="Int"))
+                        self.append_asm(ASM_Pop(temp_reg))
+                        self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
+                        return
+
                 self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
                 self.cgen(Right[1])
@@ -560,6 +546,15 @@ class CoolAsmGen:
                 # Subtraction result now in accumulator.
 
             case Times(Left,Right):
+                if self.opt:
+                    val = self.eval_constant_expr(exp)
+                    if val is not None:
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
+                        self.append_asm(ASM_Push(temp_reg))
+                        self.cgen(New(Type="Int",StaticType="Int"))
+                        self.append_asm(ASM_Pop(temp_reg))
+                        self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
+                        return
                 self.cgen(Left[1])
                 self.append_asm(ASM_Push(acc_reg))
                 self.cgen(Right[1])
@@ -585,6 +580,15 @@ class CoolAsmGen:
                 # Multiplication result now in accumulator.
 
             case Divide(Left,Right):
+                if self.opt:
+                    val = self.eval_constant_expr(exp)
+                    if val is not None:
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
+                        self.append_asm(ASM_Push(temp_reg))
+                        self.cgen(New(Type="Int",StaticType="Int"))
+                        self.append_asm(ASM_Pop(temp_reg))
+                        self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
+                        return
                 denominator_line_number = Right[0]
 
                 self.cgen(Left[1])
@@ -666,7 +670,15 @@ class CoolAsmGen:
 
 
             case Negate(Exp):
-
+                if self.opt:
+                    val = self.eval_constant_expr(exp)
+                    if val is not None:
+                        self.append_asm(ASM_Li(temp_reg,ASM_Value(val)))
+                        self.append_asm(ASM_Push(temp_reg))
+                        self.cgen(New(Type="Int",StaticType="Int"))
+                        self.append_asm(ASM_Pop(temp_reg))
+                        self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
+                        return
                 self.cgen(Exp[1])
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Li(temp_reg,ASM_Value(0)))
@@ -1029,17 +1041,52 @@ class CoolAsmGen:
         self.comment(f"cgen-: {type(exp).__name__}")
 
 
-    # compute arithmatic during compilatoin
     """
-    We might be able to just directly compute arithmetic during compilation,
-    The thing is we would need to handle things besides Integers,
-    Such as Plus, Minus, Times, Divide, Negate
-
-    We would also need to handle Identifiers. Presumably we could make another 
-    stack structure that keeps track of the actual values stored in the identifiers.
+    directly compute arithmetic during compilation
+    returns None, if it cant do it, in which case we dont constant fold.
     """
-    # def constant_fold(self,Exp):
-        
+    def eval_constant_expr(self, exp):
+        match exp:
+            case Integer(Integer=val):
+                return int(val)
+            case Plus(Left, Right):
+                l = self.eval_constant_expr(Left[1])
+                r = self.eval_constant_expr(Right[1])
+                if l is not None and r is not None:
+                    return l+r
+                else:
+                    return None 
+            case Minus(Left, Right):
+                l = self.eval_constant_expr(Left[1])
+                r = self.eval_constant_expr(Right[1])
+                if l is not None and r is not None:
+                    return l-r
+                else:
+                    return None 
+            case Times(Left, Right):
+                l = self.eval_constant_expr(Left[1])
+                r = self.eval_constant_expr(Right[1])
+                if l is not None and r is not None:
+                    return l*r
+                else:
+                    return None 
+            case Divide(Left, Right):
+                l = self.eval_constant_expr(Left[1])
+                r = self.eval_constant_expr(Right[1])
+                if l is not None and r is not None and r!=0:
+                    return l//r
+                else:
+                    return None 
+            case Negate(Exp):
+                v = self.eval_constant_expr(Exp)
+                if v is not None:
+                    return v 
+                else:
+                    return None 
+            case _:
+                # print("Not a constant: ",expear
+                return None  # Not a constant
+    
 
     def gen_dispatch_helper(self, Exp, Type, Method, Args):
         if Exp:
