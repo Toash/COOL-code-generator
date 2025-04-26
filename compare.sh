@@ -27,7 +27,7 @@ fi
 
 # cool "./tests/$test.cl" > ref_output.txt
 cool --x86 "./$1.cl" --out ref 
-gcc -no-pie -static ./$1.s -o out/ref 
+gcc -no-pie -static ./ref.s -o out/ref 
 
 if $HAS_INPUT; then
 cat "$INPUT_FILE" | ./out/ref > ./out/ref_output.txt

@@ -2,6 +2,31 @@ from asm_instructions import *
 from asm_registers import *
 from asm_constants import *
 
+def emit_comparison_handlers(asm_instructions,x86):
+    emit_comparison_handler("eq", asm_instructions,x86)
+    emit_comparison_false("eq", asm_instructions,x86)
+    emit_comparison_true("eq", asm_instructions,x86)
+    emit_comparison_bool("eq", asm_instructions,x86)
+    emit_comparison_int("eq", asm_instructions,x86)
+    emit_comparison_string("eq", asm_instructions,x86)
+    emit_comparison_end("eq", asm_instructions,x86)
+
+    emit_comparison_handler("le", asm_instructions,x86)
+    emit_comparison_false("le", asm_instructions,x86)
+    emit_comparison_true("le", asm_instructions,x86)
+    emit_comparison_bool("le", asm_instructions,x86)
+    emit_comparison_int("le", asm_instructions,x86)
+    emit_comparison_string("le", asm_instructions,x86)
+    emit_comparison_end("le", asm_instructions,x86)
+
+    emit_comparison_handler("lt", asm_instructions,x86)
+    emit_comparison_false("lt", asm_instructions,x86)
+    emit_comparison_true("lt", asm_instructions,x86)
+    emit_comparison_bool("lt", asm_instructions,x86)
+    emit_comparison_int("lt", asm_instructions,x86)
+    emit_comparison_string("lt", asm_instructions,x86)
+    emit_comparison_end("lt", asm_instructions,x86)
+
 
 """
 type can be 

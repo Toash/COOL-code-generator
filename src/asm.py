@@ -45,15 +45,15 @@ class CoolAsmGen:
 
         # expression and line number for case statement
         self.case_lines_and_exps=[]
+
         # used to keep track of the lines that we emitted case statements for
         #  TODO: delete this when i only emit  the necessary methods
         self.traversed_case_lines=[]
         self.div_zero_lines=[]
 
         # Internal attributes
-        # we done specify initializer as we handle them ourselves.
+        # we dont specify initializer as we handle them ourselves.
         self.class_map["Int"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
-        # bool also holds a raw int like the Int object.
         self.class_map["Bool"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
         self.class_map["String"].append(Attribute(Name="val",Type="Unboxed_String", Initializer=None))
 
@@ -71,32 +71,10 @@ class CoolAsmGen:
             emit_divide_by_zero(self.asm_instructions,line)
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
+
+        # we are directly emitting these from the reference compiler for x86
         if not self.x86:
-
-            emit_comparison_handler("eq", self.asm_instructions,x86)
-            emit_comparison_false("eq", self.asm_instructions,x86)
-            emit_comparison_true("eq", self.asm_instructions,x86)
-            emit_comparison_bool("eq", self.asm_instructions,x86)
-            emit_comparison_int("eq", self.asm_instructions,x86)
-            emit_comparison_string("eq", self.asm_instructions,x86)
-            emit_comparison_end("eq", self.asm_instructions,x86)
-
-            emit_comparison_handler("le", self.asm_instructions,x86)
-            emit_comparison_false("le", self.asm_instructions,x86)
-            emit_comparison_true("le", self.asm_instructions,x86)
-            emit_comparison_bool("le", self.asm_instructions,x86)
-            emit_comparison_int("le", self.asm_instructions,x86)
-            emit_comparison_string("le", self.asm_instructions,x86)
-            emit_comparison_end("le", self.asm_instructions,x86)
-
-            emit_comparison_handler("lt", self.asm_instructions,x86)
-            emit_comparison_false("lt", self.asm_instructions,x86)
-            emit_comparison_true("lt", self.asm_instructions,x86)
-            emit_comparison_bool("lt", self.asm_instructions,x86)
-            emit_comparison_int("lt", self.asm_instructions,x86)
-            emit_comparison_string("lt", self.asm_instructions,x86)
-            emit_comparison_end("lt", self.asm_instructions,x86)
-        
+            emit_comparison_handlers(self.asm_instructions,x86)
             self.emit_start()
 
 
@@ -143,13 +121,6 @@ class CoolAsmGen:
 
             if not self.x86:
                 self.append_asm(ASM_Push("ra"))
-
-
-            # FIXME: is this actually needed?
-            if self.x86:
-                self.comment("stack offset for 16 byte alignment")
-                self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
-                self.append_asm(ASM_Sub(temp_reg,"sp"))
 
             # adding 1 for type tag.
             # adding 1 for size.
@@ -234,7 +205,6 @@ class CoolAsmGen:
 
 
     def emit_methods(self)->None:
-
         # for (cname,mname), imp in self.direct_methods.items():
         for (cname,mname), imp in self.imp_map.items():
             self.current_class = cname
@@ -879,12 +849,8 @@ class CoolAsmGen:
                     self.cgen(element.Body[1])
                     self.append_asm(ASM_Jmp(end_branch))
                 
-
-
-
                 self.append_asm(ASM_Label(end_branch))
                 self.symbol_stack.pop_scope()
-
 
             case Internal(Body):
 
@@ -1078,13 +1044,13 @@ class CoolAsmGen:
                 else:
                     return None 
             case Negate(Exp):
-                v = self.eval_constant_expr(Exp)
+                v = self.eval_constant_expr(Exp[1])
                 if v is not None:
-                    return v 
+                    return -v
                 else:
                     return None 
             case _:
-                # print("Not a constant: ",expear
+                print("Not a constant: ",exp)
                 return None  # Not a constant
     
 
