@@ -1,6 +1,7 @@
 #!/bin/bash
 
 TESTS=(
+  "arith"
   # "cool_arith" #takes  input
   "cool_atoi"
   "cool_cells"
@@ -25,7 +26,6 @@ TESTS=(
   "str_out_of_bounds"
   "void_case"
   "void_dispatch"
-  "arith"
   "divide_by_zero"
   "assignment"
   "bool_no_let"
