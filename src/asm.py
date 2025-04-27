@@ -491,9 +491,11 @@ class CoolAsmGen:
                 self.cgen(Left[1])
 
 
-                self.append_asm(ASM_Push(acc_reg))
+                index = self.temporary_stack.allocate_temp()
+                self.append_asm(ASM_St("fp",acc_reg,index))
                 self.cgen(Right[1])
-                self.append_asm(ASM_Pop(temp_reg))
+                self.append_asm(ASM_Ld(temp_reg,"fp",index))
+                self.temporary_stack.free_temp()
 
                 
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
