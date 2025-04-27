@@ -32,22 +32,19 @@ class CoolAsmGen:
         for cls in self.class_map:
             if cls not in internal_classes:
                 self.class_to_tag.insert(cls)
+        
 
-        self.temporaries_needed= 0
-        self.temporary_index = 0
+        # global variables to handle temporaries :/ 
+        self.temporaries_needed = 0 # numbre of temporaries needed
+        self.temporary_index = 0 # position of next avaliable temporary
 
         self.current_class = None
 
         self.branch_counter = 0 # unique labels
 
-        # Used to generate dispatch on void labels
+        # lines used to emit strings.
         self.dispatch_lines = []
-
-        # expression and line number for case statement
         self.case_lines_and_exps=[]
-
-        # used to keep track of the lines that we emitted case statements for
-        #  TODO: delete this when i only emit  the necessary methods
         self.traversed_case_lines=[]
         self.div_zero_lines=[]
 
@@ -72,8 +69,8 @@ class CoolAsmGen:
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
 
-        # we are directly emitting these from the reference compiler for x86
         if not self.x86:
+            # do not need, we are directly emitting these from the reference compiler for x86
             emit_comparison_handlers(self.asm_instructions,x86)
             self.emit_start()
 
@@ -1044,13 +1041,14 @@ class CoolAsmGen:
                 else:
                     return None 
             case Negate(Exp):
-                v = self.eval_constant_expr(Exp[1])
+                # print(Exp)
+                v = self.eval_constant_expr(Exp)
                 if v is not None:
                     return -v
                 else:
                     return None 
             case _:
-                print("Not a constant: ",exp)
+                # print("Not a constant: ",exp)
                 return None  # Not a constant
     
 
@@ -1320,6 +1318,10 @@ class CoolAsmGen:
                 final_depth += self.compute_max_stack_depth(Method[1]) 
             case Static_Dispatch(Exp,Type,Method,Args):
                 final_depth += self.compute_max_stack_depth(Method[1]) 
+
+            # case Plus() | Minus() | Times() | Divide():
+            #     final_depth += 1
+
             case _:
                 # print("Unhandled in stack analysis:", exp)
                 pass
