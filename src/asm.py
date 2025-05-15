@@ -12,44 +12,48 @@ from asm_locations import *
 from asm_method_index import *
 from asm_string_to_label import *
 from asm_tags import *
-from asm_temporary_stack import *
 from pprint import pprint
 
 class CoolAsmGen:
     def __init__(self, file, x86=False,opt=True):
         self.opt = opt
-        self.x86=x86
         parser = AnnotatedAstReader(file)
         self.class_map, self.imp_map, self.parent_map = parser.parse()
 
+        self.x86=x86
         self.asm_instructions = [] # cool assembly emitted here.
 
-        self.temporary_stack = TemporaryStack()
         self.symbol_stack = SymbolStack()
         self.method_index = MethodIndex()
         self.string_to_label = StringToLabel(self.class_map)
         self.class_to_tag = Tags()
+
         internal_classes = ["Bool","Int","String","IO","Main","Object"]
         for cls in self.class_map:
             if cls not in internal_classes:
                 self.class_to_tag.insert(cls)
-        
 
-        # global variables to handle temporaries :/ 
-        self.temporaries_needed = 0 # numbre of temporaries needed
+        self.temporaries_needed= 0
+        self.temporary_index = 0
 
         self.current_class = None
 
         self.branch_counter = 0 # unique labels
-        # lines used to emit strings.
+
+        # Used to generate dispatch on void labels
         self.dispatch_lines = []
+
+        # expression and line number for case statement
         self.case_lines_and_exps=[]
+        # used to keep track of the lines that we emitted case statements for
+        #  TODO: delete this when i only emit  the necessary methods
         self.traversed_case_lines=[]
         self.div_zero_lines=[]
 
         # Internal attributes
-        # we dont specify initializer as we handle them ourselves.
+        # we done specify initializer as we handle them ourselves.
         self.class_map["Int"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
+        # bool also holds a raw int like the Int object.
         self.class_map["Bool"].append(Attribute(Name="val",Type="Unboxed_Int", Initializer=None))
         self.class_map["String"].append(Attribute(Name="val",Type="Unboxed_String", Initializer=None))
 
@@ -57,6 +61,7 @@ class CoolAsmGen:
         self.emit_constructors()
         self.emit_methods()
 
+        
         for line in set(self.dispatch_lines):
             emit_dispatch_on_void(self.asm_instructions,line)
         for line,exp in set(self.case_lines_and_exps):
@@ -66,10 +71,32 @@ class CoolAsmGen:
             emit_divide_by_zero(self.asm_instructions,line)
 
         emit_string_constants(self.asm_instructions,x86,self.string_to_label.get_dict_sorted())
-
         if not self.x86:
-            # do not need, we are directly emitting these from the reference compiler for x86
-            emit_comparison_handlers(self.asm_instructions,x86)
+
+            emit_comparison_handler("eq", self.asm_instructions,x86)
+            emit_comparison_false("eq", self.asm_instructions,x86)
+            emit_comparison_true("eq", self.asm_instructions,x86)
+            emit_comparison_bool("eq", self.asm_instructions,x86)
+            emit_comparison_int("eq", self.asm_instructions,x86)
+            emit_comparison_string("eq", self.asm_instructions,x86)
+            emit_comparison_end("eq", self.asm_instructions,x86)
+
+            emit_comparison_handler("le", self.asm_instructions,x86)
+            emit_comparison_false("le", self.asm_instructions,x86)
+            emit_comparison_true("le", self.asm_instructions,x86)
+            emit_comparison_bool("le", self.asm_instructions,x86)
+            emit_comparison_int("le", self.asm_instructions,x86)
+            emit_comparison_string("le", self.asm_instructions,x86)
+            emit_comparison_end("le", self.asm_instructions,x86)
+
+            emit_comparison_handler("lt", self.asm_instructions,x86)
+            emit_comparison_false("lt", self.asm_instructions,x86)
+            emit_comparison_true("lt", self.asm_instructions,x86)
+            emit_comparison_bool("lt", self.asm_instructions,x86)
+            emit_comparison_int("lt", self.asm_instructions,x86)
+            emit_comparison_string("lt", self.asm_instructions,x86)
+            emit_comparison_end("lt", self.asm_instructions,x86)
+        
             self.emit_start()
 
 
@@ -107,7 +134,6 @@ class CoolAsmGen:
         for cls,attrs in self.class_map.items():
             self.current_class = cls 
             self.symbol_stack.push_scope()
-            self.temporary_stack.push_scope()
 
 
             self.append_asm(ASM_Label(label=f"{cls}..new"))
@@ -117,6 +143,13 @@ class CoolAsmGen:
 
             if not self.x86:
                 self.append_asm(ASM_Push("ra"))
+
+
+            # FIXME: is this actually needed?
+            if self.x86:
+                self.comment("stack offset for 16 byte alignment")
+                self.append_asm(ASM_Li(temp_reg,ASM_Word(1)))
+                self.append_asm(ASM_Sub(temp_reg,"sp"))
 
             # adding 1 for type tag.
             # adding 1 for size.
@@ -198,10 +231,10 @@ class CoolAsmGen:
             self.append_asm(ASM_Return())
             
             self.symbol_stack.pop_scope()
-            self.temporary_stack.pop_scope()
 
 
     def emit_methods(self)->None:
+
         # for (cname,mname), imp in self.direct_methods.items():
         for (cname,mname), imp in self.imp_map.items():
             self.current_class = cname
@@ -246,7 +279,6 @@ class CoolAsmGen:
 
     def emit_function_prologue(self,exp) -> None:
         self.symbol_stack.push_scope()
-        self.temporary_stack.push_scope()
         # the cool way
         if not self.x86:
             self.append_asm(ASM_Mov("fp","sp"))
@@ -300,7 +332,7 @@ class CoolAsmGen:
             self.append_asm(ASM_Return())
 
         self.symbol_stack.pop_scope()
-        self.temporary_stack.pop_scope()
+        self.temporary_index = 0
 
 
     def emit_start(self)->None:
@@ -454,13 +486,9 @@ class CoolAsmGen:
 
                 # actually evaluate.
                 self.cgen(Left[1])
-
-
-                index = self.temporary_stack.allocate_temp()
-                self.append_asm(ASM_St("fp",acc_reg,index))
+                self.append_asm(ASM_Push(acc_reg))
                 self.cgen(Right[1])
-                self.append_asm(ASM_Ld(temp_reg,"fp",index))
-                self.temporary_stack.free_temp()
+                self.append_asm(ASM_Pop(temp_reg))
 
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
@@ -473,7 +501,10 @@ class CoolAsmGen:
                 self.cgen(New(Type="Int", StaticType="Int"))
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                self.append_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attributes_start_index))
 
                 # Addition result now in accumulator.
 
@@ -489,24 +520,28 @@ class CoolAsmGen:
                         return
 
                 self.cgen(Left[1])
-
-
-                index = self.temporary_stack.allocate_temp()
-                self.append_asm(ASM_St("fp",acc_reg,index))
+                self.append_asm(ASM_Push(acc_reg))
                 self.cgen(Right[1])
-                self.append_asm(ASM_Ld(temp_reg,"fp",index))
-                self.temporary_stack.free_temp()
+                self.append_asm(ASM_Pop(temp_reg))
 
-                
-                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Ld(
+                    dest = acc_reg,
+                    src = acc_reg,
+                    offset = attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.append_asm(ASM_Sub(acc_reg,temp_reg))
 
+
                 self.append_asm(ASM_Push(temp_reg))
+
                 self.cgen(New(Type="Int", StaticType="Int"))
                 self.append_asm(ASM_Pop(temp_reg))
-                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+
+                self.append_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attributes_start_index))
 
                 # Subtraction result now in accumulator.
 
@@ -521,20 +556,27 @@ class CoolAsmGen:
                         self.append_asm(ASM_St(acc_reg, temp_reg, attributes_start_index))
                         return
                 self.cgen(Left[1])
-
                 self.append_asm(ASM_Push(acc_reg))
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
+                self.append_asm(ASM_Ld(
+                    dest = acc_reg,
+                    src = acc_reg,
+                    offset = attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
                 self.append_asm(ASM_Mul(acc_reg,temp_reg))
 
                 self.append_asm(ASM_Push(temp_reg))
+
                 self.cgen(New(Type="Int", StaticType="Int"))
                 self.append_asm(ASM_Pop(temp_reg))
-                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+
+                self.append_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attributes_start_index))
                 # Multiplication result now in accumulator.
 
             case Divide(Left,Right):
@@ -550,12 +592,13 @@ class CoolAsmGen:
                 denominator_line_number = Right[0]
 
                 self.cgen(Left[1])
-                
                 self.append_asm(ASM_Push(acc_reg))
+
                 self.div_zero_lines.append(denominator_line_number)
+
+
                 self.cgen(Right[1])
                 self.append_asm(ASM_Pop(temp_reg))
-
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,attributes_start_index))
                 self.append_asm(ASM_Ld(temp_reg,temp_reg,attributes_start_index))
 
@@ -576,7 +619,10 @@ class CoolAsmGen:
                 self.cgen(New(Type="Int", StaticType="Int"))
                 self.append_asm(ASM_Pop(temp_reg))
 
-                self.append_asm(ASM_St(acc_reg,temp_reg,attributes_start_index))
+                self.append_asm(ASM_St(
+                    dest = acc_reg,
+                    src = temp_reg,
+                    offset = attributes_start_index))
                 # Division result now in accumulator.
 
 
@@ -711,7 +757,6 @@ class CoolAsmGen:
                 self.symbol_stack.push_scope()
 
 
-
                 self.comment("Let bindings")
                 for binding in Bindings:
                     self.cgen(binding)
@@ -719,6 +764,7 @@ class CoolAsmGen:
                 self.comment("Let body")
                 self.cgen(Body[1])
 
+                self.temporary_index = 0
                 self.symbol_stack.pop_scope()
 
 
@@ -732,20 +778,19 @@ class CoolAsmGen:
                     # Other objects
                     self.append_asm(ASM_Li(acc_reg,ASM_Value(0)))
 
-                index = self.temporary_stack.allocate_temp()
-                self.comment(f"Store let no init binding in fp[{index}]")
-                self.append_asm(ASM_St("fp",acc_reg,index))
-                self.symbol_stack.insert_symbol(var,Offset("fp",index))
+                self.comment(f"Store let no init binding in fp[{self.temporary_index}]")
+                self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
+                self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
+                self.temporary_index -= 1
 
             # init binding
             case Let_Init(Var,Type,Exp):
                 var = Var[1]
                 self.cgen(Exp[1])
-
-                index = self.temporary_stack.allocate_temp()
-                self.comment(f"Store let init binding in fp[{index}]")
-                self.append_asm(ASM_St("fp",acc_reg,index))
-                self.symbol_stack.insert_symbol(var,Offset("fp",index))
+                self.comment(f"Store let init binding in fp[{self.temporary_index}]")
+                self.append_asm(ASM_St("fp",acc_reg,self.temporary_index))
+                self.symbol_stack.insert_symbol(var,Offset("fp",self.temporary_index))
+                self.temporary_index -= 1
 
             case Case(Exp, Elements):
                 self.symbol_stack.push_scope()
@@ -765,8 +810,7 @@ class CoolAsmGen:
                 self.append_asm(ASM_Bz(acc_reg,void_branch))
 
                 # store expression in frame pointer.
-                index = self.temporary_stack.allocate_temp()
-                self.append_asm(ASM_St("fp",acc_reg,index))
+                self.append_asm(ASM_St("fp",acc_reg,0))
                 # load type tag into acc for comparison.
                 self.append_asm(ASM_Ld(acc_reg,acc_reg,type_tag_index))
                 temp_class_name_to_label={}
@@ -830,13 +874,17 @@ class CoolAsmGen:
                     self.append_asm(ASM_Label(case_exp_label))
 
                     # load in the branch variable or whatever its called
-                    self.symbol_stack.insert_symbol(symbol=element.Var.str,loc=Offset("fp",index))
+                    self.symbol_stack.insert_symbol(symbol=element.Var.str,loc=Offset("fp",0))
 
                     self.cgen(element.Body[1])
                     self.append_asm(ASM_Jmp(end_branch))
                 
+
+
+
                 self.append_asm(ASM_Label(end_branch))
                 self.symbol_stack.pop_scope()
+
 
             case Internal(Body):
 
@@ -1030,14 +1078,13 @@ class CoolAsmGen:
                 else:
                     return None 
             case Negate(Exp):
-                # print(Exp)
                 v = self.eval_constant_expr(Exp)
                 if v is not None:
-                    return -v
+                    return v 
                 else:
                     return None 
             case _:
-                # print("Not a constant: ",exp)
+                # print("Not a constant: ",expear
                 return None  # Not a constant
     
 
@@ -1272,10 +1319,9 @@ class CoolAsmGen:
     # for example, each let binding needs room on the stack.
     # dont need to reserve room for function args, as they are pushed on the stack prior.
     def compute_max_stack_depth(self, exp) -> int:
-        # this broke.... dont have time to debug
-        return 4001
-        # pprint(exp)
+        final_depth = 0
         match exp:
+
             case Block(Body):
                 final_depth += max(self.compute_max_stack_depth(e[1]) for e in Body)
 
@@ -1302,24 +1348,12 @@ class CoolAsmGen:
                 final_depth += body_depth
 
             # case Dynamic_Dispatch(Body) | Static_Dispatch(Body) | Self_Dispatch(Body):
-            case Self_Dispatch(Args=Args) | Dynamic_Dispatch(Args=Args)| Static_Dispatch(Args=Args):
-                max_arg_depth = 0
-                # print(Args)
-                for arg in Args:
-                    # if the length is 1 then it is an identifier
-                    arg_depth = self.compute_max_stack_depth(arg[1])
-                    if arg_depth > max_arg_depth:
-                        max_arg_depth = arg_depth
-                final_depth += max_arg_depth
-            
-            case Plus(Left,Right) | Minus(Left,Right) | Times(Left,Right) | Divide(Left,Right):
-                final_depth += 1
-                final_depth += self.compute_max_stack_depth(Left[1]) 
-                final_depth += self.compute_max_stack_depth(Right[1]) 
-
-            case Negate(Exp): 
-                final_depth += self.compute_max_stack_depth(Exp[1]) 
-
+            case Self_Dispatch(Method,Args):
+                final_depth += self.compute_max_stack_depth(Method[1]) 
+            case Dynamic_Dispatch(Exp,Method,Args):
+                final_depth += self.compute_max_stack_depth(Method[1]) 
+            case Static_Dispatch(Exp,Type,Method,Args):
+                final_depth += self.compute_max_stack_depth(Method[1]) 
             case _:
                 # print("Unhandled in stack analysis:", exp)
                 pass
