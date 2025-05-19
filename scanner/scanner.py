@@ -49,6 +49,9 @@ tokens = (
 
 reserved = {
 
+    'new':'new',
+
+    'not':'not',
     'true':'true',
     'false':'false',
 
@@ -56,6 +59,7 @@ reserved = {
     'inherits':'inherits',
 
     'if':'if',
+    'then':'then',
     'else':'else',
     'fi':'fi',
 
@@ -64,40 +68,53 @@ reserved = {
     'pool':'pool',
 
     'case':'case',
+    'of':'of',
     'esac':'esac',
 
     'let':'let',
     'in':'in',
 
-    'isvoid':'isvoid'
+    'isvoid':'isvoid',
+    
 }
 
 
 
 # Regular expression rules for simple tokens
+
+t_le = r'\<\='
+t_equals = r'\='
+
+t_larrow= r'\<\-'
+
+t_lbrace= r'\{'
+t_rbrace= r'\}'
+
+t_lparen = r'\('
+t_rparen= r'\)'
+
 t_at = r'\@'
-t_case= r'case'
-t_class = r'class'
-t_colon= r':'
-t_comma= r','
+t_colon= r'\:'
+t_comma= r'\,'
 t_dot= r'\.'
-
-t_if= r'if'
-
-
-t_equals= r'\='
+t_semi = r'\;'
+t_tilde= r'\~'
 
 t_plus= r'\+'
-t_minus= r'-'
+t_minus= r'\-'
 t_times= r'\*'
-t_divide= r'/'
+t_divide= r'\/'
 
-t_lparen= r'\('
-t_rparen= r'\)'
+
+
 
 def t_identifier(t):
     r'[a-z][A-Za-z_]*'
     t.type = reserved.get(t.value,"identifier")
+    return t
+
+def t_type(t):
+    r'[A-Z][A-Za-z_]*'
     return t
 
 def t_string(t):
@@ -105,11 +122,11 @@ def t_string(t):
     t.value = t.value[1:-1]
     return t
 
-# A regular expression rule with some action code
 def t_integer(t):
     r'\d+'
     t.value = int(t.value)    
     return t
+
 
 # Define a rule so we can track line numbers
 def t_newline(t):
@@ -118,6 +135,14 @@ def t_newline(t):
 
 # A string containing ignored characters (spaces and tabs)
 t_ignore  = ' \t'
+
+
+# -- comment or (* comments*)
+def t_COMMENT(t):
+    r'(--.*)|(\(\*(.|\n)*?\*\))'
+    t.lexer.lineno += t.value.count('\n')
+    pass
+
 
 # Error handling rule
 def t_error(t):

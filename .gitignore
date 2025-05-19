@@ -24,6 +24,7 @@ notes.txt
 
 out
 
+*.cl-lex
 # for reference
 COOL_REFERENCE
 MY_OUTPUT
