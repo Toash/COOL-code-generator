@@ -47,6 +47,32 @@ tokens = (
     'while',
 )
 
+reserved = {
+
+    'true':'true',
+    'false':'false',
+
+    'class':'class',
+    'inherits':'inherits',
+
+    'if':'if',
+    'else':'else',
+    'fi':'fi',
+
+    'while':'while',
+    'loop':'loop',
+    'pool':'pool',
+
+    'case':'case',
+    'esac':'esac',
+
+    'let':'let',
+    'in':'in',
+
+    'isvoid':'isvoid'
+}
+
+
 
 # Regular expression rules for simple tokens
 t_at = r'\@'
@@ -71,7 +97,12 @@ t_rparen= r'\)'
 
 def t_identifier(t):
     r'[a-z][A-Za-z_]*'
-    t.value = int(t.value)    
+    t.type = reserved.get(t.value,"identifier")
+    return t
+
+def t_string(t):
+    r'"[^"\n]*"'
+    t.value = t.value[1:-1]
     return t
 
 # A regular expression rule with some action code
