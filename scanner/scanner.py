@@ -83,9 +83,11 @@ reserved = {
 # Regular expression rules for simple tokens
 
 t_le = r'\<\='
+t_lt = r'\<'
 t_equals = r'\='
 
 t_larrow= r'\<\-'
+t_rarrow= r'\=\>'
 
 t_lbrace= r'\{'
 t_rbrace= r'\}'
@@ -106,15 +108,15 @@ t_times= r'\*'
 t_divide= r'\/'
 
 
-
-
 def t_identifier(t):
-    r'[a-z][A-Za-z_]*'
+    r'[a-z][A-Za-z0-9_]*'
     t.type = reserved.get(t.value,"identifier")
     return t
 
 def t_type(t):
-    r'[A-Z][A-Za-z_]*'
+    r'[A-Z][A-Za-z0-9_]*'
+    if t.value.lower() == "class":
+        t.type = "class"
     return t
 
 def t_string(t):

@@ -1,10 +1,5 @@
-My compiler does not do dead code elimination or any dataflow analysis my bad.
-
-The main optimization it does is constant folding, (eval_constant_expr). Its just matching 
-through the possible types of arithmetic and doing them in compile time. although it does not work with 
-variables which would required some dataflow analysis. 
-
-benchmark1 tests out constant folding without variables
-
-benchmark2 tests out loop unrolling that I didn't implement, where unrolling would suppposedly offer 
-more operations per control overhead.
+Optimizations:
+Constant folding, computing constant expressions during compilation instead of emitting code that does it.
+Right now this is only doing for constants, I could extend it to work with Identifiers. 
+This would presumably require keeping track of the values of identifiers in a similar manner
+as the symbol stack
