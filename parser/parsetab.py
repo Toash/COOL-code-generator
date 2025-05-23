@@ -6,9 +6,9 @@ _tabversion = '3.10'
 
 _lr_method = 'LALR'
 
-_lr_signature = 'leftPLUSMINUSleftTIMESDIVIDEAT CASE CLASS COLON COMMA DIVIDE DOT ELSE EQUALS ESAC FALSE FI IDENTIFIER IF IN INHERITS INTEGER ISVOID LARROW LBRACE LE LET LOOP LPAREN LT MINUS NEW NOT OF PLUS POOL RARROW RBRACE RPAREN SEMI STRING THEN TILDE TIMES TRUE TYPE WHILEprogram : classlist\n                classlist : class SEMI classlist \n                        | class SEMI\n                \n                class : CLASS type LBRACE featurelist RBRACE\n                type : TYPEidentifier : IDENTIFIERfeaturelist :featurelist : feature SEMI featurelistfeature : identifier COLON typefeature : identifier COLON type LARROW expexp : exp PLUS expexp : exp MINUS expexp : exp TIMES expexp : exp DIVIDE expexp : INTEGER'
+_lr_signature = 'leftPLUSMINUSleftTIMESDIVIDEAT CASE CLASS COLON COMMA DIVIDE DOT ELSE EQUALS ESAC FALSE FI IDENTIFIER IF IN INHERITS INTEGER ISVOID LARROW LBRACE LE LET LOOP LPAREN LT MINUS NEW NOT OF PLUS POOL RARROW RBRACE RPAREN SEMI STRING THEN TILDE TIMES TRUE TYPE WHILEprogram : classlist\n                classlist : class SEMI classlist \n                        | class SEMI\n                \n                class : CLASS type LBRACE featurelist RBRACE\n                \n                class : CLASS type INHERITS type LBRACE featurelist RBRACE\n                type : TYPEidentifier : IDENTIFIERfeaturelist :featurelist : feature SEMI featurelistfeature : identifier COLON typefeature : identifier COLON type LARROW expformal : identifier COLON typeformallist : formal COMMA formallist\n                | formal \n                feature : identifier LPAREN formallist RPAREN COLON type LBRACE exp RBRACEexp : exp PLUS expexp : exp MINUS expexp : exp TIMES expexp : exp DIVIDE expexp : INTEGER'
     
-_lr_action_items = {'CLASS':([0,5,],[4,4,]),'$end':([1,2,5,8,],[0,-1,-3,-2,]),'SEMI':([3,7,11,14,18,20,21,26,27,28,29,],[5,-5,15,-4,-9,-10,-15,-11,-12,-13,-14,]),'TYPE':([4,16,],[7,7,]),'LBRACE':([6,7,],[9,-5,]),'LARROW':([7,18,],[-5,19,]),'RBRACE':([9,10,15,17,],[-7,14,-7,-8,]),'IDENTIFIER':([9,15,],[13,13,]),'COLON':([12,13,],[16,-6,]),'INTEGER':([19,22,23,24,25,],[21,21,21,21,21,]),'PLUS':([20,21,26,27,28,29,],[22,-15,-11,-12,-13,-14,]),'MINUS':([20,21,26,27,28,29,],[23,-15,-11,-12,-13,-14,]),'TIMES':([20,21,26,27,28,29,],[24,-15,24,24,-13,-14,]),'DIVIDE':([20,21,26,27,28,29,],[25,-15,25,25,-13,-14,]),}
+_lr_action_items = {'CLASS':([0,5,],[4,4,]),'$end':([1,2,5,8,],[0,-1,-3,-2,]),'SEMI':([3,7,12,16,22,31,32,33,42,43,44,45,48,],[5,-6,17,-4,-10,-5,-11,-20,-16,-17,-18,-19,-15,]),'TYPE':([4,10,18,28,35,],[7,7,7,7,7,]),'LBRACE':([6,7,15,41,],[9,-6,20,46,]),'INHERITS':([6,7,],[10,-6,]),'LARROW':([7,22,],[-6,27,]),'COMMA':([7,25,34,],[-6,30,-12,]),'RPAREN':([7,24,25,34,36,],[-6,29,-14,-12,-13,]),'RBRACE':([9,11,17,20,21,26,33,42,43,44,45,47,],[-8,16,-8,-8,-9,31,-20,-16,-17,-18,-19,48,]),'IDENTIFIER':([9,17,19,20,30,],[14,14,14,14,14,]),'COLON':([13,14,23,29,],[18,-7,28,35,]),'LPAREN':([13,14,],[19,-7,]),'INTEGER':([27,37,38,39,40,46,],[33,33,33,33,33,33,]),'PLUS':([32,33,42,43,44,45,47,],[37,-20,-16,-17,-18,-19,37,]),'MINUS':([32,33,42,43,44,45,47,],[38,-20,-16,-17,-18,-19,38,]),'TIMES':([32,33,42,43,44,45,47,],[39,-20,39,39,-18,-19,39,]),'DIVIDE':([32,33,42,43,44,45,47,],[40,-20,40,40,-18,-19,40,]),}
 
 _lr_action = {}
 for _k, _v in _lr_action_items.items():
@@ -17,7 +17,7 @@ for _k, _v in _lr_action_items.items():
       _lr_action[_x][_k] = _y
 del _lr_action_items
 
-_lr_goto_items = {'program':([0,],[1,]),'classlist':([0,5,],[2,8,]),'class':([0,5,],[3,3,]),'type':([4,16,],[6,18,]),'featurelist':([9,15,],[10,17,]),'feature':([9,15,],[11,11,]),'identifier':([9,15,],[12,12,]),'exp':([19,22,23,24,25,],[20,26,27,28,29,]),}
+_lr_goto_items = {'program':([0,],[1,]),'classlist':([0,5,],[2,8,]),'class':([0,5,],[3,3,]),'type':([4,10,18,28,35,],[6,15,22,34,41,]),'featurelist':([9,17,20,],[11,21,26,]),'feature':([9,17,20,],[12,12,12,]),'identifier':([9,17,19,20,30,],[13,13,23,13,23,]),'formallist':([19,30,],[24,36,]),'formal':([19,30,],[25,25,]),'exp':([27,37,38,39,40,46,],[32,42,43,44,45,47,]),}
 
 _lr_goto = {}
 for _k, _v in _lr_goto_items.items():
@@ -31,15 +31,20 @@ _lr_productions = [
   ('classlist -> class SEMI classlist','classlist',3,'p_classlist','parser.py',63),
   ('classlist -> class SEMI','classlist',2,'p_classlist','parser.py',64),
   ('class -> CLASS type LBRACE featurelist RBRACE','class',5,'p_class_noinherit','parser.py',74),
-  ('type -> TYPE','type',1,'p_type','parser.py',79),
-  ('identifier -> IDENTIFIER','identifier',1,'p_identifier','parser.py',83),
-  ('featurelist -> <empty>','featurelist',0,'p_featurelist_none','parser.py',88),
-  ('featurelist -> feature SEMI featurelist','featurelist',3,'p_featurelist_some','parser.py',91),
-  ('feature -> identifier COLON type','feature',3,'p_feature_attribute_no_init','parser.py',95),
-  ('feature -> identifier COLON type LARROW exp','feature',5,'p_feature_attribute_init','parser.py',98),
-  ('exp -> exp PLUS exp','exp',3,'p_exp_plus','parser.py',102),
-  ('exp -> exp MINUS exp','exp',3,'p_exp_minus','parser.py',106),
-  ('exp -> exp TIMES exp','exp',3,'p_exp_times','parser.py',110),
-  ('exp -> exp DIVIDE exp','exp',3,'p_exp_divide','parser.py',114),
-  ('exp -> INTEGER','exp',1,'p_exp_integer','parser.py',118),
+  ('class -> CLASS type INHERITS type LBRACE featurelist RBRACE','class',7,'p_class_inherit','parser.py',80),
+  ('type -> TYPE','type',1,'p_type','parser.py',85),
+  ('identifier -> IDENTIFIER','identifier',1,'p_identifier','parser.py',89),
+  ('featurelist -> <empty>','featurelist',0,'p_featurelist_none','parser.py',94),
+  ('featurelist -> feature SEMI featurelist','featurelist',3,'p_featurelist_some','parser.py',97),
+  ('feature -> identifier COLON type','feature',3,'p_feature_attribute_no_init','parser.py',101),
+  ('feature -> identifier COLON type LARROW exp','feature',5,'p_feature_attribute_init','parser.py',104),
+  ('formal -> identifier COLON type','formal',3,'p_formal','parser.py',108),
+  ('formallist -> formal COMMA formallist','formallist',3,'p_formallist','parser.py',112),
+  ('formallist -> formal','formallist',1,'p_formallist','parser.py',113),
+  ('feature -> identifier LPAREN formallist RPAREN COLON type LBRACE exp RBRACE','feature',9,'p_feature_method','parser.py',120),
+  ('exp -> exp PLUS exp','exp',3,'p_exp_plus','parser.py',124),
+  ('exp -> exp MINUS exp','exp',3,'p_exp_minus','parser.py',128),
+  ('exp -> exp TIMES exp','exp',3,'p_exp_times','parser.py',132),
+  ('exp -> exp DIVIDE exp','exp',3,'p_exp_divide','parser.py',136),
+  ('exp -> INTEGER','exp',1,'p_exp_integer','parser.py',140),
 ]

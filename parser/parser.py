@@ -75,6 +75,12 @@ if __name__ == "__main__":
                 '''
                 p[0] = (p.lineno(1), 'class_noinherits', p[2], p[4])
 
+            def p_class_inherit(p):
+                '''
+                class : CLASS type INHERITS type LBRACE featurelist RBRACE
+                '''
+                p[0] = (p.lineno(1), 'class_inherits', p[2], p[4],p[6])
+
             def p_type(p):
                 'type : TYPE'
                 p[0] = (p.lineno(1), p[1])
@@ -97,6 +103,22 @@ if __name__ == "__main__":
             def p_feature_attribute_init(p):
                 'feature : identifier COLON type LARROW exp'
                 p[0] = (p[1][0], 'attribute_init',p[1],p[3],p[5])
+
+            def p_formal(p):
+                'formal : identifier COLON type'
+                p[0] = (p[1][0], 'formal',p[1],p[3])
+
+            def p_formallist(p):
+                '''formallist : formal COMMA formallist
+                | formal 
+                '''
+                if len(p) == 4:
+                    p[0] = [p[1]] + p[3]
+                else:
+                    p[0] = [p[1]] 
+            def p_feature_method(p):
+                'feature : identifier LPAREN formallist RPAREN COLON type LBRACE exp RBRACE'
+                p[0] = (p[1][0], 'method',p[1],p[3],p[6],p[8])
 
             def p_exp_plus(p):
                 'exp : exp PLUS exp'
@@ -156,6 +178,10 @@ if __name__ == "__main__":
                         print("unhandled expression")
                         sys.exit(1)
 
+                def print_formal(ast):
+                    print_identifier(ast[2])
+                    print_identifier(ast[3])
+                    
                 def print_feature(ast):
                     if ast[1] == 'attribute_no_init':
                         ast_file.write("attribute_no_init\n")
@@ -166,6 +192,12 @@ if __name__ == "__main__":
                         print_identifier(ast[2])
                         print_identifier(ast[3])
                         print_exp(ast[4]) 
+                    elif ast[1] == 'method':
+                        ast_file.write("method\n")
+                        print_identifier(ast[2])
+                        print_list(ast[3],print_formal)
+                        print_identifier(ast[4])
+                        print_exp(ast[5])
                     else:
                         print("unhandled feature")
                         sys.exit(1)
@@ -173,9 +205,17 @@ if __name__ == "__main__":
 
                 def print_class(ast): 
                     print_identifier(ast[2])
-                    # FIXME
-                    ast_file.write("no_inherits\n")
-                    print_list(ast[3],print_feature)
+                    if ast[1] == "class_noinherits":
+                        ast_file.write("no_inherits\n")
+                        print_list(ast[3],print_feature)
+                    elif ast[1] == "class_inherits":
+                        ast_file.write("inherits\n")
+                        print_identifier(ast[2])
+                        print_list(ast[4],print_feature)
+                    else:
+                        print("unhandled class type")
+                        sys.exit(1)
+
                 
                 def print_program(ast):
                     print_list(ast, print_class)
