@@ -49,6 +49,11 @@ if __name__ == "__main__":
 
                 lexer.lex_tokens.append((int(lineno),type.upper(),lexeme))
 
+            precedence = (
+                ('left', 'PLUS', 'MINUS'),
+                ('left', 'TIMES', 'DIVIDE'),
+            )
+
             # grammar rules
             def p_program_classlist(p):
                 'program : classlist'
@@ -88,7 +93,31 @@ if __name__ == "__main__":
             
             def p_feature_attribute_no_init(p):
                 'feature : identifier COLON type'
-                p[0] = (p.lineno(1), 'attribute_no_init',p[1],p[3])
+                p[0] = (p[1][0], 'attribute_no_init',p[1],p[3])
+            def p_feature_attribute_init(p):
+                'feature : identifier COLON type LARROW exp'
+                p[0] = (p[1][0], 'attribute_init',p[1],p[3],p[5])
+
+            def p_exp_plus(p):
+                'exp : exp PLUS exp'
+                p[0] = (p[1][0], 'plus', p[1], p[3])
+
+            def p_exp_minus(p):
+                'exp : exp MINUS exp'
+                p[0] = (p[1][0], 'minus', p[1], p[3])
+
+            def p_exp_times(p):
+                'exp : exp TIMES exp'
+                p[0] = (p[1][0], 'times', p[1], p[3])
+
+            def p_exp_divide(p):
+                'exp : exp DIVIDE exp'
+                p[0] = (p[1][0], 'divide', p[1], p[3])
+            
+            def p_exp_integer(p):
+                'exp : INTEGER'
+                p[0] = (p.lineno(1), 'integer', p[1])
+
             
             def p_error(p):
                 if p:
@@ -115,11 +144,31 @@ if __name__ == "__main__":
                     ast_file.write(str(ast[0]) + "\n")
                     ast_file.write( ast[1] + "\n")
 
+                def print_exp(ast):
+                    ast_file.write( str(ast[0]) + "\n")
+                    ast_file.write( ast[1] + "\n")
+                    if ast[1] in ['plus','minus','times','divide']:
+                        print_exp(ast[2]) 
+                        print_exp(ast[3]) 
+                    elif ast[1] == 'integer':
+                        ast_file.write(str(ast[2]) + "\n")
+                    else:
+                        print("unhandled expression")
+                        sys.exit(1)
+
                 def print_feature(ast):
-                    # FIXME
-                    ast_file.write("attribute_no_init\n")
-                    print_identifier(ast[2])
-                    print_identifier(ast[3])
+                    if ast[1] == 'attribute_no_init':
+                        ast_file.write("attribute_no_init\n")
+                        print_identifier(ast[2])
+                        print_identifier(ast[3])
+                    elif ast[1] == 'attribute_init':
+                        ast_file.write("attribute_init\n")
+                        print_identifier(ast[2])
+                        print_identifier(ast[3])
+                        print_exp(ast[4]) 
+                    else:
+                        print("unhandled feature")
+                        sys.exit(1)
                     
 
                 def print_class(ast): 

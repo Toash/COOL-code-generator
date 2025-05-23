@@ -6,9 +6,9 @@ _tabversion = '3.10'
 
 _lr_method = 'LALR'
 
-_lr_signature = 'AT CASE CLASS COLON COMMA DIVIDE DOT ELSE EQUALS ESAC FALSE FI IDENTIFIER IF IN INHERITS INTEGER ISVOID LARROW LBRACE LE LET LOOP LPAREN LT MINUS NEW NOT OF PLUS POOL RARROW RBRACE RPAREN SEMI STRING THEN TILDE TIMES TRUE TYPE WHILEprogram : classlist\n                classlist : class SEMI classlist \n                        | class SEMI\n                \n                class : CLASS type LBRACE featurelist RBRACE\n                type : TYPEidentifier : IDENTIFIERfeaturelist :featurelist : feature SEMI featurelistfeature : identifier COLON type'
+_lr_signature = 'leftPLUSMINUSleftTIMESDIVIDEAT CASE CLASS COLON COMMA DIVIDE DOT ELSE EQUALS ESAC FALSE FI IDENTIFIER IF IN INHERITS INTEGER ISVOID LARROW LBRACE LE LET LOOP LPAREN LT MINUS NEW NOT OF PLUS POOL RARROW RBRACE RPAREN SEMI STRING THEN TILDE TIMES TRUE TYPE WHILEprogram : classlist\n                classlist : class SEMI classlist \n                        | class SEMI\n                \n                class : CLASS type LBRACE featurelist RBRACE\n                type : TYPEidentifier : IDENTIFIERfeaturelist :featurelist : feature SEMI featurelistfeature : identifier COLON typefeature : identifier COLON type LARROW expexp : exp PLUS expexp : exp MINUS expexp : exp TIMES expexp : exp DIVIDE expexp : INTEGER'
     
-_lr_action_items = {'CLASS':([0,5,],[4,4,]),'$end':([1,2,5,8,],[0,-1,-3,-2,]),'SEMI':([3,7,11,14,18,],[5,-5,15,-4,-9,]),'TYPE':([4,16,],[7,7,]),'LBRACE':([6,7,],[9,-5,]),'RBRACE':([9,10,15,17,],[-7,14,-7,-8,]),'IDENTIFIER':([9,15,],[13,13,]),'COLON':([12,13,],[16,-6,]),}
+_lr_action_items = {'CLASS':([0,5,],[4,4,]),'$end':([1,2,5,8,],[0,-1,-3,-2,]),'SEMI':([3,7,11,14,18,20,21,26,27,28,29,],[5,-5,15,-4,-9,-10,-15,-11,-12,-13,-14,]),'TYPE':([4,16,],[7,7,]),'LBRACE':([6,7,],[9,-5,]),'LARROW':([7,18,],[-5,19,]),'RBRACE':([9,10,15,17,],[-7,14,-7,-8,]),'IDENTIFIER':([9,15,],[13,13,]),'COLON':([12,13,],[16,-6,]),'INTEGER':([19,22,23,24,25,],[21,21,21,21,21,]),'PLUS':([20,21,26,27,28,29,],[22,-15,-11,-12,-13,-14,]),'MINUS':([20,21,26,27,28,29,],[23,-15,-11,-12,-13,-14,]),'TIMES':([20,21,26,27,28,29,],[24,-15,24,24,-13,-14,]),'DIVIDE':([20,21,26,27,28,29,],[25,-15,25,25,-13,-14,]),}
 
 _lr_action = {}
 for _k, _v in _lr_action_items.items():
@@ -17,7 +17,7 @@ for _k, _v in _lr_action_items.items():
       _lr_action[_x][_k] = _y
 del _lr_action_items
 
-_lr_goto_items = {'program':([0,],[1,]),'classlist':([0,5,],[2,8,]),'class':([0,5,],[3,3,]),'type':([4,16,],[6,18,]),'featurelist':([9,15,],[10,17,]),'feature':([9,15,],[11,11,]),'identifier':([9,15,],[12,12,]),}
+_lr_goto_items = {'program':([0,],[1,]),'classlist':([0,5,],[2,8,]),'class':([0,5,],[3,3,]),'type':([4,16,],[6,18,]),'featurelist':([9,15,],[10,17,]),'feature':([9,15,],[11,11,]),'identifier':([9,15,],[12,12,]),'exp':([19,22,23,24,25,],[20,26,27,28,29,]),}
 
 _lr_goto = {}
 for _k, _v in _lr_goto_items.items():
@@ -27,13 +27,19 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S' -> program","S'",1,None,None,None),
-  ('program -> classlist','program',1,'p_program_classlist','parser.py',54),
-  ('classlist -> class SEMI classlist','classlist',3,'p_classlist','parser.py',58),
-  ('classlist -> class SEMI','classlist',2,'p_classlist','parser.py',59),
-  ('class -> CLASS type LBRACE featurelist RBRACE','class',5,'p_class_noinherit','parser.py',69),
-  ('type -> TYPE','type',1,'p_type','parser.py',74),
-  ('identifier -> IDENTIFIER','identifier',1,'p_identifier','parser.py',78),
-  ('featurelist -> <empty>','featurelist',0,'p_featurelist_none','parser.py',83),
-  ('featurelist -> feature SEMI featurelist','featurelist',3,'p_featurelist_some','parser.py',86),
-  ('feature -> identifier COLON type','feature',3,'p_feature_attribute_no_init','parser.py',90),
+  ('program -> classlist','program',1,'p_program_classlist','parser.py',59),
+  ('classlist -> class SEMI classlist','classlist',3,'p_classlist','parser.py',63),
+  ('classlist -> class SEMI','classlist',2,'p_classlist','parser.py',64),
+  ('class -> CLASS type LBRACE featurelist RBRACE','class',5,'p_class_noinherit','parser.py',74),
+  ('type -> TYPE','type',1,'p_type','parser.py',79),
+  ('identifier -> IDENTIFIER','identifier',1,'p_identifier','parser.py',83),
+  ('featurelist -> <empty>','featurelist',0,'p_featurelist_none','parser.py',88),
+  ('featurelist -> feature SEMI featurelist','featurelist',3,'p_featurelist_some','parser.py',91),
+  ('feature -> identifier COLON type','feature',3,'p_feature_attribute_no_init','parser.py',95),
+  ('feature -> identifier COLON type LARROW exp','feature',5,'p_feature_attribute_init','parser.py',98),
+  ('exp -> exp PLUS exp','exp',3,'p_exp_plus','parser.py',102),
+  ('exp -> exp MINUS exp','exp',3,'p_exp_minus','parser.py',106),
+  ('exp -> exp TIMES exp','exp',3,'p_exp_times','parser.py',110),
+  ('exp -> exp DIVIDE exp','exp',3,'p_exp_divide','parser.py',114),
+  ('exp -> INTEGER','exp',1,'p_exp_integer','parser.py',118),
 ]
