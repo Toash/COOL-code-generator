@@ -85,9 +85,6 @@ if __name__ == "__main__":
                 'type : TYPE'
                 p[0] = (p.lineno(1), p[1])
 
-            def p_identifier(p):
-                'identifier : IDENTIFIER'
-                p[0] = (p.lineno(1), p[1])
 
             
             def p_featurelist_none(p):
@@ -111,14 +108,45 @@ if __name__ == "__main__":
             def p_formallist(p):
                 '''formallist : formal COMMA formallist
                 | formal 
+                |
                 '''
                 if len(p) == 4:
                     p[0] = [p[1]] + p[3]
-                else:
+                elif len(p) == 2:
                     p[0] = [p[1]] 
+                else:
+                    p[0] = []
             def p_feature_method(p):
                 'feature : identifier LPAREN formallist RPAREN COLON type LBRACE exp RBRACE'
                 p[0] = (p[1][0], 'method',p[1],p[3],p[6],p[8])
+
+            def p_assign(p):
+                'exp : identifier LARROW exp'
+                p[0] = (p[1][0], 'assign',p[1],p[3])
+
+
+            def p_explist(p):
+                '''explist : exp COMMA explist
+                |          exp 
+                |
+                '''
+                if len(p) == 4:
+                    p[0] = [p[1]] + p[3]
+                elif len(p)==2:
+                    p[0] = [p[1]] 
+                else: 
+                    p[0] = []
+
+            def p_dynamic_dispatch(p):
+                'exp : exp DOT identifier LPAREN explist RPAREN'
+                p[0] = (p[1][0], 'dynamic_dispatch', p[1], p[3],p[5])
+            def p_static_dispatch(p):
+                'exp : exp AT type DOT identifier LPAREN explist RPAREN'
+                p[0] = (p[1][0], 'static_dispatch', p[1], p[3],p[5],p[7])
+            def p_self_dispatch(p):
+                'exp : identifier LPAREN explist RPAREN'
+                p[0] = (p[1][0], 'self_dispatch', p[1], p[3])
+
 
             def p_exp_plus(p):
                 'exp : exp PLUS exp'
@@ -136,6 +164,12 @@ if __name__ == "__main__":
                 'exp : exp DIVIDE exp'
                 p[0] = (p[1][0], 'divide', p[1], p[3])
             
+            def p_exp_identifier(p):
+                'exp : identifier'
+                p[0] = (p[1][0], 'identifier', p[1])
+            def p_identifier(p):
+                'identifier : IDENTIFIER'
+                p[0] = (p.lineno(1), p[1])
             def p_exp_integer(p):
                 'exp : INTEGER'
                 p[0] = (p.lineno(1), 'integer', p[1])
@@ -163,7 +197,9 @@ if __name__ == "__main__":
                         print_element_function(elem)
 
                 def print_identifier(ast):
+                    #line #
                     ast_file.write(str(ast[0]) + "\n")
+                    # value
                     ast_file.write( ast[1] + "\n")
 
                 def print_exp(ast):
@@ -172,8 +208,23 @@ if __name__ == "__main__":
                     if ast[1] in ['plus','minus','times','divide']:
                         print_exp(ast[2]) 
                         print_exp(ast[3]) 
+                    elif ast[1] == 'dynamic_dispatch':
+                        print_exp(ast[2])
+                        print_identifier(ast[3])
+                        print_list(ast[4],print_exp)
+                    elif ast[1] == 'static_dispatch':
+                        print_exp(ast[2])
+                        print_identifier(ast[3])
+                        print_identifier(ast[4])
+                        print_list(ast[5],print_exp)
+                    elif ast[1] == 'self_dispatch':
+                        print_identifier(ast[2])
+                        print_list(ast[3],print_exp)
+                    elif ast[1] == 'identifier':
+                        print_identifier(ast[2])
                     elif ast[1] == 'integer':
                         ast_file.write(str(ast[2]) + "\n")
+                    
                     else:
                         print("unhandled expression")
                         sys.exit(1)
@@ -181,7 +232,7 @@ if __name__ == "__main__":
                 def print_formal(ast):
                     print_identifier(ast[2])
                     print_identifier(ast[3])
-                    
+
                 def print_feature(ast):
                     if ast[1] == 'attribute_no_init':
                         ast_file.write("attribute_no_init\n")

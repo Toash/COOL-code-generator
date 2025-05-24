@@ -1,5 +1,6 @@
 import os
 import subprocess
+import difflib
 
 parser = "parser.py"
 input_dir = "./tests"
@@ -22,15 +23,29 @@ for fname in os.listdir(input_dir):
         with open(input_parse, "r") as f1, open(reference_parse, "r") as f2:
             output1 = f1.read()
             output2 = f2.read()
+        # if output1 == output2:
+        #     print(input_parse+ " ✅")
+        # else:
+        #     print(input_parse+ " ❌")
         if output1 == output2:
-            print(input_parse+ " ✅")
+            print(input_parse + " ✅")
         else:
-            print(input_parse+ " ❌")
+            print(input_parse + " ❌")
+            diff = difflib.unified_diff(
+                output2.splitlines(),  
+                output1.splitlines(),  
+                fromfile='reference.cl-ast',
+                tofile=fname + "-ast",
+                lineterm=''
+            )
+            for line in diff:
+                print(line)
 
 
-        subprocess.run(["rm",input_lex])
-        subprocess.run(["rm",input_parse])
-        subprocess.run(["rm",reference_parse])
+
+        # subprocess.run(["rm",input_lex])
+        # subprocess.run(["rm",input_parse])
+        # subprocess.run(["rm",reference_parse])
         
         
 
