@@ -32,26 +32,33 @@ if __name__ == "__main__":
             
             def get_token_line():
                 global lines
-                result = lines[0].strip()
+                result = lines[0]
                 lines = lines[1:]
                 return result
 
             # append tokens to lexer. 
             lexer = Lexer()
             while lines:
-                lineno = get_token_line()
-                type = get_token_line()
+                lineno = get_token_line().strip()
+                type = get_token_line().strip()
                 lexeme =type 
             
                 # has lexeme
                 if has_lexeme(type):
-                    lexeme = get_token_line()
+                    lexeme = get_token_line().rstrip('\n')
 
                 lexer.lex_tokens.append((int(lineno),type.upper(),lexeme))
 
             precedence = (
+                ('right', 'LARROW'),
+                ('left', 'NOT'),
+                ('nonassoc', 'LE', 'LT', 'EQUALS'),
                 ('left', 'PLUS', 'MINUS'),
                 ('left', 'TIMES', 'DIVIDE'),
+                ('left', 'ISVOID'),
+                ('left', 'TILDE'),
+                ('left', 'AT'),
+                ('left', 'DOT'),
             )
 
             # grammar rules
@@ -154,9 +161,16 @@ if __name__ == "__main__":
                 'exp : WHILE exp LOOP exp POOL'
                 p[0] = (p.lineno(1), 'while', p[2], p[4])
             
-            # this allows a block with no expression but its way simpler
+            def p_block_explist(p):
+                '''block_exp_list : exp SEMI block_exp_list
+                | exp SEMI'''
+                if len(p) == 4:
+                    p[0] = [p[1]] + p[3]
+                else: 
+                    p[0] = [p[1]] 
+
             def p_block(p):
-                'exp : LBRACE explist RBRACE'
+                'exp : LBRACE block_exp_list RBRACE'
                 p[0] = (p.lineno(1), 'block', p[2])
 
                
@@ -194,21 +208,48 @@ if __name__ == "__main__":
                 'exp : CASE exp OF elementlist ESAC'
                 p[0] = (p.lineno(1),'case',p[2],p[4])
 
+            def p_new(p):
+                'exp : NEW type'
+                p[0] = (p.lineno(1),'new',p[2])
+            def p_isvoid(p):
+                'exp : ISVOID exp'
+                p[0] = (p.lineno(1),'isvoid',p[2])
+
             def p_exp_plus(p):
                 'exp : exp PLUS exp'
                 p[0] = (p[1][0], 'plus', p[1], p[3])
-
             def p_exp_minus(p):
                 'exp : exp MINUS exp'
                 p[0] = (p[1][0], 'minus', p[1], p[3])
-
             def p_exp_times(p):
                 'exp : exp TIMES exp'
                 p[0] = (p[1][0], 'times', p[1], p[3])
-
             def p_exp_divide(p):
                 'exp : exp DIVIDE exp'
                 p[0] = (p[1][0], 'divide', p[1], p[3])
+            def p_negate(p):
+                'exp : TILDE exp'
+                p[0] = (p.lineno(1), 'negate', p[2])
+
+            def p_lt(p):
+                'exp : exp LT exp'
+                p[0] = (p[1][0], 'lt',p[1],p[3])
+            def p_le(p):
+                'exp : exp LE exp'
+                p[0] = (p[1][0], 'le',p[1],p[3])
+            def p_eq(p):
+                'exp : exp EQUALS exp'
+                p[0] = (p[1][0], 'eq',p[1],p[3])
+            def p_not(p):
+                'exp : NOT exp'
+                p[0] = (p.lineno(1), 'not',p[2])
+            
+            # ?
+            def p_paren(p):
+                'exp : LPAREN exp RPAREN'
+                p[0] = p[2] 
+
+            
             
             def p_exp_identifier(p):
                 'exp : identifier'
@@ -219,11 +260,20 @@ if __name__ == "__main__":
             def p_exp_integer(p):
                 'exp : INTEGER'
                 p[0] = (p.lineno(1), 'integer', p[1])
+            def p_exp_string(p):
+                'exp : STRING'
+                p[0] = (p.lineno(1), 'string', p[1])
+            def p_exp_true(p):
+                'exp : TRUE'
+                p[0] = (p.lineno(1), 'true', p[1])
+            def p_exp_false(p):
+                'exp : FALSE'
+                p[0] = (p.lineno(1), 'false', p[1])
 
             
             def p_error(p):
                 if p:
-                    print("Syntax error at token", p.type)
+                    print(f"Syntax error at token {p.type}, on line {p.lineno}")
                     sys.exit(1)
                 else:
                     print("Syntax error at EOF")
@@ -251,9 +301,9 @@ if __name__ == "__main__":
                 def print_exp(ast):
                     ast_file.write( str(ast[0]) + "\n")
                     ast_file.write( ast[1] + "\n")
-                    if ast[1] in ['plus','minus','times','divide']:
-                        print_exp(ast[2]) 
-                        print_exp(ast[3]) 
+                    if ast[1] == 'assign':
+                        print_identifier(ast[2])
+                        print_exp(ast[3])
                     elif ast[1] == 'dynamic_dispatch':
                         print_exp(ast[2])
                         print_identifier(ast[3])
@@ -266,18 +316,53 @@ if __name__ == "__main__":
                     elif ast[1] == 'self_dispatch':
                         print_identifier(ast[2])
                         print_list(ast[3],print_exp)
-                    elif ast[1] == 'identifier':
-                        print_identifier(ast[2])
-                    elif ast[1] == 'integer':
-                        ast_file.write(str(ast[2]) + "\n")
+                    elif ast[1] == 'if':
+                        print_exp(ast[2])
+                        print_exp(ast[3])
+                        print_exp(ast[4])
+                    elif ast[1] == 'while':
+                        print_exp(ast[2])
+                        print_exp(ast[3])
+                    elif ast[1] == 'block':
+                        print_list(ast[2],print_exp)
                     elif ast[1] == 'let': 
                         print_list(ast[2],print_binding)
                         print_exp(ast[3])
                     elif ast[1] == 'case':
                         print_exp(ast[2])
                         print_list(ast[3],print_element)
+                    elif ast[1] == 'new':
+                        print_identifier(ast[2])
+                    elif ast[1] == 'isvoid':
+                        print_exp(ast[2])
+                    elif ast[1] in ['plus','minus','times','divide']:
+                        print_exp(ast[2]) 
+                        print_exp(ast[3]) 
+                    elif ast[1] == 'negate':
+                        print_exp(ast[2])
+                    elif ast[1] == 'lt':
+                        print_exp(ast[2])
+                        print_exp(ast[3])
+                    elif ast[1] == 'le':
+                        print_exp(ast[2])
+                        print_exp(ast[3])
+                    elif ast[1] == 'eq':
+                        print_exp(ast[2])
+                        print_exp(ast[3])
+                    elif ast[1] == 'not':
+                        print_exp(ast[2])
+                    elif ast[1] == 'identifier':
+                        print_identifier(ast[2])
+                    elif ast[1] == 'integer':
+                        ast_file.write(str(ast[2]) + "\n")
+                    elif ast[1] == 'string':
+                        ast_file.write(str(ast[2]) + "\n")
+                    elif ast[1] == 'true':
+                        pass
+                    elif ast[1] == 'false':
+                        pass
                     else:
-                        print("unhandled expression")
+                        print("unhandled expression: ", ast)
                         sys.exit(1)
 
 
@@ -332,7 +417,7 @@ if __name__ == "__main__":
                         print_list(ast[3],print_feature)
                     elif ast[1] == "class_inherits":
                         ast_file.write("inherits\n")
-                        print_identifier(ast[2])
+                        print_identifier(ast[3])
                         print_list(ast[4],print_feature)
                     else:
                         print("unhandled class type")
