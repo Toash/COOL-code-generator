@@ -147,6 +147,38 @@ if __name__ == "__main__":
                 'exp : identifier LPAREN explist RPAREN'
                 p[0] = (p[1][0], 'self_dispatch', p[1], p[3])
 
+            def p_if(p):
+                'exp : IF exp THEN exp ELSE exp FI'
+                p[0] = (p.lineno(1), 'if', p[2], p[4],p[6])
+            def p_while(p):
+                'exp : WHILE exp LOOP exp POOL'
+                p[0] = (p.lineno(1), 'while', p[2], p[4])
+            
+            # this allows a block with no expression but its way simpler
+            def p_block(p):
+                'exp : LBRACE explist RBRACE'
+                p[0] = (p.lineno(1), 'block', p[2])
+
+               
+            def p_bindinglist(p): 
+                '''bindinglist : binding COMMA bindinglist
+                | binding
+                '''
+                if len(p) == 4:
+                    p[0] = [p[1]] + p[3]
+                else: 
+                    p[0] = [p[1]]
+            def p_binding_no_init(p):
+                'binding : identifier COLON type'
+                p[0] = (p[1][0], "let_binding_no_init",p[1],p[3])
+            def p_binding_init(p):
+                'binding : identifier COLON type LARROW exp'
+                p[0] = (p[1][0], "let_binding_init",p[1],p[3],p[5])
+
+            def p_let(p):
+                'exp : LET bindinglist IN exp'
+                p[0] = (p.lineno(1), "let",p[2],p[4])
+
 
             def p_exp_plus(p):
                 'exp : exp PLUS exp'
@@ -224,9 +256,25 @@ if __name__ == "__main__":
                         print_identifier(ast[2])
                     elif ast[1] == 'integer':
                         ast_file.write(str(ast[2]) + "\n")
-                    
+                    elif ast[1] == 'let': 
+                        print_list(ast[2],print_binding)
+                        print_exp(ast[3])
                     else:
                         print("unhandled expression")
+                        sys.exit(1)
+
+                def print_binding(ast):
+                    if ast[1] == "let_binding_no_init":
+                        ast_file.write("let_binding_no_init\n")
+                        print_identifier(ast[2])
+                        print_identifier(ast[3])
+                    elif ast[1] == "let_binding_init":
+                        ast_file.write("let_binding_init\n")
+                        print_identifier(ast[2])
+                        print_identifier(ast[3])
+                        print_exp(ast[4])
+                    else:
+                        print("unhandled let binding")
                         sys.exit(1)
 
                 def print_formal(ast):
