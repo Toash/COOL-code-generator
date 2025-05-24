@@ -179,6 +179,20 @@ if __name__ == "__main__":
                 'exp : LET bindinglist IN exp'
                 p[0] = (p.lineno(1), "let",p[2],p[4])
 
+            def p_case_element_list(p):
+                '''elementlist : element elementlist 
+                | element'''
+                if len(p) == 3:
+                    p[0] = [p[1]] + p[2]
+                else:
+                    p[0] = [p[1]]
+
+            def p_case_element(p):
+                'element : identifier COLON type RARROW exp SEMI'
+                p[0] = (p[1][0], 'case_element',p[1],p[3],p[5])
+            def p_case(p):
+                'exp : CASE exp OF elementlist ESAC'
+                p[0] = (p.lineno(1),'case',p[2],p[4])
 
             def p_exp_plus(p):
                 'exp : exp PLUS exp'
@@ -259,9 +273,18 @@ if __name__ == "__main__":
                     elif ast[1] == 'let': 
                         print_list(ast[2],print_binding)
                         print_exp(ast[3])
+                    elif ast[1] == 'case':
+                        print_exp(ast[2])
+                        print_list(ast[3],print_element)
                     else:
                         print("unhandled expression")
                         sys.exit(1)
+
+
+                def print_element(ast):
+                    print_identifier(ast[2])
+                    print_identifier(ast[3])
+                    print_exp(ast[4])
 
                 def print_binding(ast):
                     if ast[1] == "let_binding_no_init":

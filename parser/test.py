@@ -41,9 +41,9 @@ for fname in os.listdir(input_dir):
             for line in diff:
                 print(line)
 
-        # subprocess.run(["rm",input_lex])
-        # subprocess.run(["rm",input_parse])
-        # subprocess.run(["rm",reference_parse])
+        subprocess.run(["rm",input_lex])
+        subprocess.run(["rm",input_parse])
+        subprocess.run(["rm",reference_parse])
         
         
 
