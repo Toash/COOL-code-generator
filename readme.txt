@@ -6,6 +6,7 @@ are represented in assembly. We learned about object layout, virtual tables to s
 More information for each stage is in each directory.
 
 Files:
+
 SCANNER
 ./scanner/scanner.py - scans tokens
 
@@ -16,8 +17,9 @@ SEMANTIC ANALYZER
 ./semantic/semantic.ml  - semantic analyzer, type checks, creates class, implementation, and parent maps for use in later stages.
 
 CODE GENERATION
-./codegen/src/asm.py emits cool assembly instructions from an annotated ast.
-./codegen/src/x86.py emits x86 AT&T assembly from cool assembly.
+./codegen/src - source code for the code generation stage.
+./codegen/src/asm.py - emits cool assembly instructions from an annotated ast.
+./codegen/src/x86.py - emits x86 AT&T assembly from cool assembly.
 
 
 EXAMPLE PROGRAMS
