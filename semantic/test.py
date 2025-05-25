@@ -5,6 +5,8 @@ import difflib
 semantic= "semantic.py"
 input_dir = "./tests"
 
+# compile semantic analyzer
+subprocess.run(["ocamlc","-o","semantic","semantic.ml"])
 for fname in os.listdir(input_dir):
     if fname.endswith(".cl"):
         input_cl = os.path.join(input_dir,fname)
@@ -19,7 +21,8 @@ for fname in os.listdir(input_dir):
         reference_type= input_cl[:-3] + "-reference.cl-type"
 
 
-        subprocess.run(["python3",semantic,input_parse])
+        # subprocess.run(["python3",semantic,input_parse])
+        subprocess.run(["./semantic",input_parse])
         subprocess.run(["cool",input_lex,"--type","--out",reference_type[:-8]])
         
         with open(input_type, "r") as f1, open(reference_type, "r") as f2:
@@ -29,15 +32,15 @@ for fname in os.listdir(input_dir):
             print(input_type+ " ✅")
         else:
             print(input_type+ " ❌")
-            diff = difflib.unified_diff(
-                output2.splitlines(),  
-                output1.splitlines(),  
-                fromfile=reference_type,
-                tofile=input_type,
-                lineterm=''
-            )
-            for line in diff:
-                print(line)
+            # diff = difflib.unified_diff(
+            #     output2.splitlines(),  
+            #     output1.splitlines(),  
+            #     fromfile=reference_type,
+            #     tofile=input_type,
+            #     lineterm=''
+            # )
+            # for line in diff:
+            #     print(line)
 
         subprocess.run(["rm",input_lex])
         subprocess.run(["rm",input_parse])

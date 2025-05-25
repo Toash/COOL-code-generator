@@ -8,6 +8,8 @@
 *.out
 *.cl-asm
 *.s
+*.cmx
+*.o
 examples
 testcases
 more_tests

@@ -43,8 +43,8 @@ for fname in os.listdir(input_dir):
                 print(line)
 
         subprocess.run(["rm",input_lex])
-        # subprocess.run(["rm",input_parse])
-        # subprocess.run(["rm",reference_parse])
+        subprocess.run(["rm",input_parse])
+        subprocess.run(["rm",reference_parse])
         
         
 
