@@ -7,7 +7,7 @@
 *.cl-input
 *.out
 *.cl-asm
-*.s
+# *.s
 *.cmx
 *.o
 examples
