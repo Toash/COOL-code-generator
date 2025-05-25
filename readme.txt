@@ -1,7 +1,6 @@
 Scanning, parsing, semantic analyzing, code generation and optimization for CS485 Special Topics: Compilers
 
-COOL is an toy programming language with object oriented features, An interesting part of this project was figuring out how objects
-are represented in assembly. We learned about object layout, virtual tables to store pointers to functions, and how this works for inheritance.
+COOL is an toy programming language with object oriented features, An interesting part of this project was figuring out how objects are represented in assembly. We learned about object layout, virtual tables to store pointers to functions, and how this works for inheritance.
 
 More information for each stage is in each directory.
 
